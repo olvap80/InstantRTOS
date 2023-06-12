@@ -1,6 +1,7 @@
 /** @file InstantCoroutine.h
     @brief Simple minimalistic coroutines suitable for all various platforms (like Arduino)
     when native C++ coroutines are too heavyweight (or co_yield and stuff does not work)
+    platform independent (does not depend on CPU, only standard C++ is required!)
 
     (c) see https://github.com/olvap80/InstantRTOS
 
@@ -9,7 +10,7 @@
     Use coroutines instead of writing explicit finite state machines.
 
     Implemented as stackless coroutines, own coroutine state is only two bytes,
-    one can add custom state variables that turn to class fields. 
+    one can add any custom state variables that turn to class fields.
 
     Example Usage (generate sequences):
     @code

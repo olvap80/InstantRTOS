@@ -1,6 +1,6 @@
 /** @file InstantDelegate.h
-    @brief Fast deterministic memory pools with immediate allocation,
-           suitable for real time (no heap allocation)
+    @brief Fast deterministic delegates for invoking callbacks/function pointers,
+           suitable for real time operation (no heap allocation at all)
 
     (c) and license see https://github.com/olvap80/InstantRTOS
 
@@ -23,12 +23,12 @@
         }
         ...
 
-        //creating callback
+        //various ways for creating the callback from code
         
-        //one can make callback from C++ lambda
+        //one can make callback directly from C++ lambda
         CustomAPI( MyCallback([](int val){ return val + 42;}) );
 
-        //and from "simple" function (implicit conversion supported)
+        //and from "simple" function (implicit conversion is supported)
         CustomAPI( ordinary_function_with_compatible_signature );
         
         //also one can create Delegate that calls method of some object 
@@ -56,8 +56,8 @@
 
     NOTE: The Delegate instance created for C++ lambda
           will not copy that C++ lambda!
-          It is responsibility of the developer to ensure
-          Delegate is not called after original callable/lambda is destructed
+          It is responsibility of the developer to ensure that Delegate
+          is not called after original callable/lambda is destructed
 
 
     Additional sample, serves as a demo to cover more possible usages
@@ -274,7 +274,7 @@ public:
 
 
     ///Helper class to create Delegate instances, see Bind API below
-    /** For usage in chained call, see sample below.
+    /** For using in a chained call, see sample for Bind above and below.
      * Ties methods/functions statically, see sample below */
     template<class C>
     class BoundDelegateBuilder;

@@ -1,5 +1,5 @@
 /** @file InstantTimer.h
-    @brief Simple timing objects to track timings in platform independent way
+    @brief Simple timing classes to track timings in platform independent way
 
     Simple platform independent time counting, without any dependencies,
     straight forward implementation to use directly from program loop,
@@ -126,6 +126,8 @@ public:
      * meaning is defined by the user.
      * Actually SimpleTimer does not measure time,
      * user has to provide measurements!
+     * This shall be the type returned by your time measurement API.
+     * It is assumed that time grows continuously with unsigned overflow.
      * It is assumed that arithmetic is unsigned (two's complement)
      * https://stackoverflow.com/a/18195756/4336953 */
     using Ticks = INSTANTTIMER_TICKS_TYPE;
@@ -181,6 +183,11 @@ public:
         return false;
     }
 
+    /// Test timer is expired without altering state (time is not checked!)  
+    bool IsExpired() const {
+        return expired;
+    }
+
     ///Force timer to be marked as expired
     /** Once marked as expired, Check API will return tur,
      * but CheckForEdge will not react */
@@ -205,9 +212,10 @@ public:
     bool CheckForEdge(OtherTicks currentTicks, Ticks delta) = delete;
 
 private:
-    /// True if timer is expired (not waiting for )
+    /// True if timer is expired (not waiting for the next)
     bool expired = true;
     ///Time when Check starts to return true
+    /** In this way we remember only the single value to compare with */
     Ticks expectedAbsoluteTicks = 0;
 };
 
@@ -228,6 +236,8 @@ public:
      * meaning is defined by the user.
      * Actually PeriodicTimer does not measure time,
      * user has to provide measurements!
+     * This shall be the type returned by your time measurement API.
+     * It is assumed that time grows continuously with unsigned overflow.
      * It is assumed that arithmetic is unsigned (two's complement)
      * https://stackoverflow.com/a/18195756/4336953 */
     using Ticks = INSTANTTIMER_TICKS_TYPE;

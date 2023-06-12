@@ -1,9 +1,9 @@
-/** @file InstantArduino.ino 
+/** @file InstantArduino.h 
     @brief Common Arduino centric include
 
     MIT License
 
-    Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantArduino
+    Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,56 @@
     SOFTWARE.
 */
 
-//TODO: Arduino specific tuning
+#ifndef InstantArduino_INCLUDED_H
+#define InstantArduino_INCLUDED_H
 
-//TODO: include all the stuff
+// Main include file for the Arduino SDK (makes vscode hints happy)
+#include "Arduino.h"
+
+
+// General utility headers _____________________________________________________
+
+// Simple minimalistic coroutines suitable for all various platforms 
+// (like Arduino!) for the case when native C++ coroutines are too heavyweight
+// (or when co_yield and stuff does not work)
+#include "InstantCoroutine.h"
+
+// Fast deterministic delegates for invoking callbacks,
+// suitable for real time operation (no heap allocation at all)
+#include "InstantDelegate.h"
+
+
+// Timing, intervals and scheduling ____________________________________________
+
+// Simple timing classes to track timings in platform independent way
+#include "InstantTimer.h"
+
+// The simplest possible portable scheduler suitable for embedded 
+// platforms like Arduino (actually only standard C++ is required)
+//#include "InstantScheduler.h"
+
+
+// Memory and queueing _________________________________________________________
+
+// Simple deterministic memory management utilities suitable for real time
+// can be used for dynamic memory allocations on Arduino and similar platform
+//#include "InstantMemory.h"
+
+// Simple deterministic queues suitable for real time
+// can be used for dynamic memory allocations on Arduino and similar platforms.
+//#include "InstantQueue.h"
+
+
+// Other handy utility stuff ___________________________________________________
+
+// General debouncing, see ArduinoDebounce below
+#include "InstantDebounce.h"
+
+//Handle hardware signals being mapped to memory
+//#include "InstantSignals.h"
+
+
+
+
+
+#endif
