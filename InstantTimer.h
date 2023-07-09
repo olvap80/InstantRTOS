@@ -24,25 +24,25 @@
         #define LED_OFF digitalWrite(LED_BUILTIN, LOW)
 
         PeriodicTimer periodic_timer_signal;
-        #define SIGNAL_PIN 7
+        #define SIGNAL_PIN 4
         bool signalState = false;
 
         void setup() {
             Serial.begin(115200);
-            
+
             pinMode(LED_BUILTIN, OUTPUT);
             pinMode(SIGNAL_PIN, OUTPUT);
 
-            //Note: we need to set periodic_timer_signal only once
-            periodic_timer_signal.StartPeriod(micros(), 500);
+            //Note: timer_led is initially expired, so we will enter under if
+            
+            auto us = micros();
+            timer_led.Start(us, 1000000);
+            periodic_timer_signal.StartPeriod(us, 500);
         }
 
         void loop() {
             auto us = micros();
-            if( timer_led.Check(us)){
-                // remember SimpleTimer is initially "expired", 
-                //so we will immediately enter condition
-
+            if( timer_led.Discover(us) ){
                 if(!ledState){
                     LED_ON;
                 }
@@ -50,16 +50,18 @@
                     LED_OFF;
                 }
                 ledState = !ledState;
+                //need to "charge" simple timer every time 
                 timer_led.Start(us, 1000000);
             }
-            if(!ledState){
+            if( !ledState ){
                 Serial.println(F("1"));
             }
             else{
                 Serial.println(F("0"));
             }
 
-            if( periodic_timer_signal.CheckForEdge(us) ){
+            //PeriodicTimer is "recharged" automatically 
+            if( periodic_timer_signal.Discover(us) ){
                 digitalWrite(SIGNAL_PIN, signalState);
                 signalState = !signalState;
             }
@@ -95,23 +97,23 @@
 #define InstantTimer_INCLUDED_H
 
 
-#ifndef INSTANTTIMER_TICKS_TYPE
+#ifndef InstantTimer_Ticks_Type
     ///Type to be used for storing time measurements and time calculations
     /** This shall be the type returned by your time measurement API.
      * It is assumed that time grows continuously with unsigned overflow.
      * It is assumed that arithmetic is unsigned (two's complement)
      * https://stackoverflow.com/a/18195756/4336953 */ 
-    #define INSTANTTIMER_TICKS_TYPE unsigned long
+    #define InstantTimer_Ticks_Type unsigned long
 #endif
 
 
 ///Simplest timer to be scheduled directly from the code
 /** Hide tick counting logic behind straight forward interface,
  * You choose units and API to work with the physical timer,
- * and provide measurements to Start and Check API.
+ * and provide measurements to Start() and Discover() API.
  * The only assumption is that SimpleTimer::Ticks size must match
  * your units of time measurements.
- * REMEMBER: it is user's responsibility to call Check API frequent enough
+ * REMEMBER: it is user's responsibility to call Discover() API frequent enough
  *           to make timer work with desired precision */
 class SimpleTimer{
 public:
@@ -130,7 +132,7 @@ public:
      * It is assumed that time grows continuously with unsigned overflow.
      * It is assumed that arithmetic is unsigned (two's complement)
      * https://stackoverflow.com/a/18195756/4336953 */
-    using Ticks = INSTANTTIMER_TICKS_TYPE;
+    using Ticks = InstantTimer_Ticks_Type;
 
     /// The maximum ticks amount SimpleTimer is able to wait
     static constexpr Ticks DeltaMax = ~Ticks(0) / 2;
@@ -138,7 +140,7 @@ public:
 
     /// Mark timer as "non expired" and remember expiration moment
     /** Remembers "expected" time for the timer to expire,
-     * from now all calls to Check return false,
+     * from now all calls to IsExpired() return false,
      * until delta ticks expires. */
     void Start(Ticks currentTicks, Ticks delta){
         expectedAbsoluteTicks = currentTicks + delta;
@@ -146,51 +148,49 @@ public:
         expired = false;
     }
 
-    ///Check time expired (using currentTicks provided by the user)
-    /** Turns true once delta ticks expires since call to Start API,
-     * after expiration all the subsequent calls return true,
-     * until Start is called again.
-     * It is assumed that Check is called more often then DeltaMax,
-     * thus we will not miss the moment once timer expires */
-    bool Check(Ticks currentTicks){
+    /// Update and check for the "edge" as signal transitions to expired
+    /** Returns true only when delta ticks expires since call to Start API
+     * this means new "expiration state" detected ("discovered"),
+     * then all other subsequent calls will return false again.
+     * Use IsExpired() API to check if timer "fired" in past.
+     * Call Start() to "recharge" the timer again.
+     *
+     * It is assumed that Discover() is called more often then DeltaMax,
+     * (actually more often then expected time precision!)
+     * thus we will not miss the moment once timer expires! */
+    bool Discover(Ticks currentTicks){
         if( !expired ){
             //compare unsigned values assuming two's complement
             if( (currentTicks - expectedAbsoluteTicks) > DeltaMax ){
                 //current time is still before the desired time
                 return false;
             }
-            //Time passed
+            // We have just detected time passed
             expired = true;
-        }
-        return true;
-    }
-
-    ///Check only for the edge as signal transitions to expired
-    /** Turns to true only when delta ticks expires since call to Start API,
-     * then all other the subsequent calls return false. */
-    bool CheckForEdge(Ticks currentTicks){
-        if( !expired ){
-            //compare unsigned values assuming two's complement
-            if( (currentTicks - expectedAbsoluteTicks) > DeltaMax ){
-                //current time is still before the desired time
-                return false;
-            }
-            //Time passed
-            expired = true;
-            //the only moment when true is returned
+            //expiration detection is the only moment when true is returned
             return true;
         }
         return false;
     }
 
-    /// Test timer is expired without altering state (time is not checked!)  
+    /// Test timer is expired without altering state (time is not checked!)
+    /** Reads existing state (as calculated by the most recent Discover() call)
+     * \returns false only between Start and expiration moment,
+     *          true is returned before Start() of after Expire.
+     * 
+     * Remember one must periodically call Discover() API to detect expiration!
+     * Discover() returns true only as "edge" of expiration moment is detected,
+     * After Discover() has detected expiration, IsExpired() always returns true
+     * till Start() is called to "recharge" */
     bool IsExpired() const {
         return expired;
     }
 
-    ///Force timer to be marked as expired
-    /** Once marked as expired, Check API will return tur,
-     * but CheckForEdge will not react */
+    /// Force timer to be marked as expired
+    /** Once marked as expired, Discover() API will have no effect 
+     * and return false (as a sign that "nothing more was discovered"),
+     * but all subsequent calls to IsExpired() will return true from now!
+     * Call Start to "recharge" timer again. */
     void ForceExpire(){
         expired = true;
     } 
@@ -204,24 +204,19 @@ public:
     ///Suppress any "incompatible" timings
     /** This forces using exact Ticks type */
     template<class OtherTicks>
-    bool Check(OtherTicks currentTicks) = delete;
-
-    ///Suppress any "incompatible" timings
-    /** This forces using exact Ticks type */
-    template<class OtherTicks>
-    bool CheckForEdge(OtherTicks currentTicks, Ticks delta) = delete;
+    bool Discover(OtherTicks currentTicks) = delete;
 
 private:
     /// True if timer is expired (not waiting for the next)
     bool expired = true;
-    ///Time when Check starts to return true
-    /** In this way we remember only the single value to compare with */
+    ///Time when Timer will expire (Discover() API shall detect expiration)
+    /** In this way we remember only the single value to compare with! */
     Ticks expectedAbsoluteTicks = 0;
 };
 
 
 /// Simplest periodic timer
-/** REMEMBER: it is user's responsibility to call Check API frequent enough
+/** REMEMBER: it is user's responsibility to call Discover() API frequent enough
  *            to make timer work with desired precision */
 class PeriodicTimer{
 public:
@@ -240,7 +235,7 @@ public:
      * It is assumed that time grows continuously with unsigned overflow.
      * It is assumed that arithmetic is unsigned (two's complement)
      * https://stackoverflow.com/a/18195756/4336953 */
-    using Ticks = INSTANTTIMER_TICKS_TYPE;
+    using Ticks = InstantTimer_Ticks_Type;
 
 
     /// The maximum ticks amount PeriodicTimer is able to wait
@@ -249,17 +244,19 @@ public:
 
     /// Start timing periods and remember the next period moment
     /** Remembers "expected" time for the timer to detect next period,
-     * Use periodic call to CheckForEdge to detect next period moment */
+     * Use periodic call to Discover() to detect next period moment */
     void StartPeriod(Ticks currentTicks, Ticks period){
         generationPeriod = period;
         nextPeriodAbsoluteTicks = currentTicks + period;
     }
 
 
-    ///Check only for the edge as signal transitions to expired (new period started)
-    /** Turns to true only when period ticks expires since call to Start API,
-     * then all other the subsequent calls return false. */
-    bool CheckForEdge(Ticks currentTicks){
+    /// Update state and check for the edge as new period started
+    /** Returns true only when period ticks expires since call to Start API,
+     * then all other the subsequent calls return false.
+     * This call updates PeriodicTimer state, subsequent call see that modification,
+     * remember to Discover() more often then corresponding period! */
+    bool Discover(Ticks currentTicks){
         if( generationPeriod ){
             //compare unsigned values assuming two's complement
             if( (currentTicks - nextPeriodAbsoluteTicks) > PeriodMax ){
@@ -269,7 +266,7 @@ public:
             //Time passed
 
             //next time in the future 
-            //(not from the currentTicks but from expected ticks)
+            //(not from the currentTicks but from expected ticks!)
             nextPeriodAbsoluteTicks += generationPeriod;
 
             //the only moment when true is returned
@@ -288,20 +285,20 @@ public:
         generationPeriod = 0;
     }
 
-    ///Suppress any "incompatible" timings
+    /// Suppress any "incompatible" timings
     /** This forces using exact Ticks type */
     template<class OtherTicks>
     void StartPeriod(OtherTicks currentTicks, Ticks delta) = delete;
 
-    ///Suppress any "incompatible" timings
+    /// Suppress any "incompatible" timings
     /** This forces using exact Ticks type */
     template<class OtherTicks>
-    bool CheckForEdge(OtherTicks currentTicks, Ticks delta) = delete;
+    bool Discover(OtherTicks currentTicks) = delete;
 
 public:
     /// True when period generation is active
     Ticks generationPeriod = 0;
-    ///Time when Check starts to return true
+    /// Time when Discover() shall detect next period
     Ticks nextPeriodAbsoluteTicks = 0;
 };
 

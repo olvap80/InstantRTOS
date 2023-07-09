@@ -1,6 +1,7 @@
 /** @file InstantDelegate.h
     @brief Fast deterministic delegates for invoking callbacks/function pointers,
            suitable for real time operation (no heap allocation at all)
+           "bound" delegates are also supported for calling methods of objects.
 
     (c) and license see https://github.com/olvap80/InstantRTOS
 
@@ -10,7 +11,9 @@
     Any "callable stuff" can be handled with InstantDelegate library :)
     Suitable for embedded real time applications requiring deterministic behavior.
     
-    You can just copy this to your project, it dos not depend on InstantArduino.
+    You can just copy this to your project, it dos not depend on InstantRTOS.
+    Single header, no build steps required!
+    
     Short sample:
     @code
         //shorthand to not repeat the same signature every time
@@ -31,9 +34,9 @@
         //and from "simple" function (implicit conversion is supported)
         CustomAPI( ordinary_function_with_compatible_signature );
         
-        //also one can create Delegate that calls method of some object 
+        //also one can create Delegate for calling method of some object 
         SomeClass targetObject{42};
-        CustomAPI( MyCallback::Bind(targetObject).Method<&SomeClass::some_method>() );
+        CustomAPI( MyCallback::From(targetObject).Bind<&SomeClass::some_method>() );
 
         //and callable things having compatible operator() can also be referenced
         class SomeFunctor{
@@ -165,23 +168,23 @@
             const TestClass demoCallable5{5};
             //Note: direct call without delegate is demoCallable5.test_method(42);
             test(
-                Delegate<int(int)>::Bind(demoCallable5).Method<&TestClass::test_method>()
+                Delegate<int(int)>::From(demoCallable5).Bind<&TestClass::test_method>()
             );
             //Ensure method pointer can be created with short syntax
             TestClass demoCallable6{6};
             test(
-                Delegate<int(int)>::Bind(&demoCallable6).Method<&TestClass::test_method>()
+                Delegate<int(int)>::From(&demoCallable6).Bind<&TestClass::test_method>()
             );
 
             //Ensure method pointer can be created from reference
             TestClass demoCallable7{7};
             test(
-                Delegate<int(int)>::Bind(demoCallable7).Function<&function_to_bind_receivingRef>()
+                Delegate<int(int)>::From(demoCallable7).Bind<&function_to_bind_receivingRef>()
             );
             //Ensure method pointer can be created with short syntax
             TestClass demoCallable8{8};
             test(
-                Delegate<int(int)>::Bind(&demoCallable8).Function<&function_to_bind_receivingPtr>()
+                Delegate<int(int)>::From(&demoCallable8).Bind<&function_to_bind_receivingPtr>()
             );
 
             delay(4200);
@@ -266,15 +269,8 @@ public:
     constexpr Delegate(SimpleCaseCallee* simpleCaseCallee);
 
 
-    ///Force delegate reference from temporary functor (be aware what you do)
-    /** NOTE: this is not for storage, only as parameters like [&](...){ lambda!
-     *        Be aware: do not store permanently after API exits */
-    template<class Functor>
-    static constexpr Delegate Unstorable(Functor&& functor);
-
-
-    ///Helper class to create Delegate instances, see Bind API below
-    /** For using in a chained call, see sample for Bind above and below.
+    ///Helper class to create Delegate instances, see From...Bind API below
+    /** For using in a chained call, see sample for From...Bind above and below.
      * Ties methods/functions statically, see sample below */
     template<class C>
     class BoundDelegateBuilder;
@@ -283,28 +279,42 @@ public:
     /** Allow method or function to be bound to instance reference
     Usage Sample (creating Delegate for wrapping method)
     @code
-        Delegate<int(int)>::Bind(objectName).Method<&ClassName::method>()
-        Delegate<int(int)>::Bind(objectName).Function<&function_to_bind_receivingRef>()
-        Delegate<int(int)>::Bind(objectName).Function<&function_to_bind_receivingPtr>()
-    @endcode */
+        Delegate<int(int)>::From(objectName).Bind<&ClassName::method>()
+        Delegate<int(int)>::From(objectName).Bind<&function_to_bind_receivingRef>()
+        Delegate<int(int)>::From(objectName).Bind<&function_to_bind_receivingPtr>()
+    @endcode 
+    REMEMBER: OBJECT SHALL CONTINUE TO EXIST AS LONG
+              AS THERE ARE CORRESPONDING DELEGATES REFERRING TO IT!!! */
     template<class C>
     static constexpr typename 
-    Delegate::template BoundDelegateBuilder<C> Bind(C& object);
+    Delegate::template BoundDelegateBuilder<C> From(C& object);
 
     ///Easily create Delegate (closure) from instance and method pointer
     /** Allow method or function to be bound to pointer
     Usage Sample (creating Delegate for wrapping method)
     @code
-        Delegate<int(int)>::Bind(&objectName).Method<&ClassName::method>()
-        Delegate<int(int)>::Bind(&objectName).Function<&function_to_bind_receivingRef>()
-        Delegate<int(int)>::Bind(&objectName).Function<&function_to_bind_receivingPtr>()
-    @endcode */
+        Delegate<int(int)>::From(&objectName).Bind<&ClassName::method>()
+        Delegate<int(int)>::From(&objectName).Bind<&function_to_bind_receivingRef>()
+        Delegate<int(int)>::From(&objectName).Bind<&function_to_bind_receivingPtr>()
+    @endcode
+    REMEMBER: OBJECT SHALL CONTINUE TO EXIST AS LONG
+              AS THERE ARE CORRESPONDING DELEGATES REFERRING TO IT!!! */
     template<class C>
     static constexpr typename
-    Delegate::template BoundDelegateBuilder<C> Bind(C* objectPointer);
+    Delegate::template BoundDelegateBuilder<C> From(C* objectPointer);
+
 
     ///Test delegate points to something (is "not null")
     constexpr explicit operator bool() const;
+
+
+    ///Force delegate reference from temporary functor (be aware see below)
+    /** NOTE: this is not for storage, only as parameters like [&](...){ lambda!
+     *        Be aware: do not store permanently after API exits */
+    template<class Functor>
+    static constexpr Delegate Unstorable(Functor&& functor);
+
+
     ///Check this instance is "less" then other
     constexpr bool operator <(const Delegate& other) const;
     ///Check this instance is "greater" then other
@@ -314,19 +324,22 @@ public:
     ///Check this instance is "not equal" to other
     constexpr bool operator !=(const Delegate& other) const;
 
+
     //allow all the copying and assignments
     constexpr Delegate(const Delegate&) = default;
     constexpr Delegate(Delegate&&) = default;
     Delegate& operator =(const Delegate&) = default;
     Delegate& operator =(Delegate&&) = default;
 
-private:
+
+protected:
+
     ///Signature of the caller is the same for all instances with the same signature
     using InternalCallerType = Res(const Delegate* self, Args...);
 
     ///All callers have the same signature, regardless of what is called
     /** the operator(...) invokes correspondingCaller uniformly */
-    InternalCallerType* correspondingCaller = nullptr;
+    mutable InternalCallerType* correspondingCaller = nullptr;
 
     //union allows us to follow absolute minimalism
     union{
@@ -341,8 +354,17 @@ private:
         /** Make Delegate "universal", so that not only functor objects,
          * but also "simple" functions can be attached! */
         SimpleCaseCallee* simpleCaseCallee;
+
+        /// Counter for derived EventSlot (save space))
+        mutable unsigned untrackedEventsCount;
     };
 
+    ///Internal constructor to tie with actual caller and object
+    constexpr Delegate(InternalCallerType* caller);
+
+private:
+    // allow EventSlot to construct with custom InternalCallerType 
+    friend class EventSlot;
 
     ///Internal constructor to tie with actual caller and object
     constexpr Delegate(InternalCallerType* caller, void* theCalleeAsObjectToUse);
@@ -395,37 +417,152 @@ private:
 };
 
 
+///Shortcut for the delegate without parameters (event)
+using EventCallback = Delegate<void()>;
+
+/// Callable Event that remembers the fact of calls before callback is attached
+/** It is possible to call EventSlot before callback is attached,
+ * call counts is accumulated and can be obtained via UntrackedEventsCount(),
+ * Then(...) or Set(...) API can be used to tie with arrived calls */
+class EventSlot: private EventCallback{
+public:
+    // cannot copy such event (as there is no "state sharing" for it!)
+    EventSlot(const EventSlot& other) = delete;
+    EventSlot& operator=(const EventSlot& other) = delete;
+
+
+    /// Setup initial EventSlot to work 
+    EventSlot() : EventCallback(callFutureBeforeThen) {
+        untrackedEventsCount = 0;
+    }
+
+    /// Setup already attached event
+    EventSlot(const EventCallback& eventCallback)
+        : EventCallback(eventCallback) {}
+
+
+    /* Allow calling event (and make it functor)
+       Prefer direct call of that event (the fastest way to work),
+       one can wrap reference to EventSlot in Delegate (EventCallback),
+       but remember EventSlot shall live as long as there are references */
+    using EventCallback::operator();
+
+
+    /// Setup new callback to execute on (and after) operator() call
+    /** Callback will execute immediately if EventSlot was previously called,
+     *  and only one time even if there were multiple previous calls.
+     *  After that such callback will execute once operator()
+     * NOTE: there is no way to return more events for chaining */
+    void Then(const EventCallback& eventCallback){
+        auto untrackedEventsCountPrev = 0;
+        if( correspondingCaller == callFutureBeforeThen ){
+            //we were still before assignment
+            untrackedEventsCountPrev = untrackedEventsCount;
+        }
+        EventCallback::operator=(eventCallback);
+        if( untrackedEventsCountPrev ){
+            // call the operator one time as the sign there were other calls
+            operator()();
+        }
+    }
+
+    /// Setup new callback to execute only on operator() call
+    /** Callback will execute only once operator() called,
+     *  precious calls on operator() have no effect
+     * NOTE: there is no way to return more events for chaining */
+    void Set(const EventCallback& eventCallback){
+        EventCallback::operator=(eventCallback);
+    }
+
+    /// Obtain number of event that did not invoke eventCallback
+    /** Can provide nonzero value only before Then(...) or Set(...),
+     * or after ResetCallback() is called.
+     * \returns number on times operator() without callback,
+     *          always 0 when callback was set */
+    unsigned UntrackedEventsCount() const {
+        if( correspondingCaller == callFutureBeforeThen ){
+            return untrackedEventsCount;
+        }
+        return 0;
+    }
+
+
+    /// Reset to initial state (will silently count again)
+    void ResetCallback(){
+        correspondingCaller = callFutureBeforeThen;
+        untrackedEventsCount = 0;
+    }
+
+
+    /// EventCallback (Delegate) what will call EventSlot and ResetCallback it
+    /** Use this API to create "single shot" subscriptions for this EventSlot,
+     * such delegate will call EventSlot and ResetCallback(), 
+     * so that EventSlot::Then(...) has to be set again
+     * NOTE: REMEMBER TO OVERWRITE UntrackedEventsCount EXISTING SUBSCRIPTION
+     *       ON EventSlot Reset TO PREVENT "message from the past" */
+    EventCallback MakeUnsubscribingCallback(){
+        return EventCallback(unsubscribeOnCall, this);
+    }
+
+
+private:
+
+    ///Handle the case when item to be called is simple function
+    static void callFutureBeforeThen(const EventCallback* self){
+        ++static_cast<const EventSlot*>(self)->untrackedEventsCount;
+    }
+
+    static void unsubscribeOnCall(const EventCallback* self){
+        auto target = static_cast<EventSlot*>(self->theCalleeAsObject);
+        // call the EventSlot instance
+        (*target)();
+        // reset 
+        target->ResetCallback();
+
+        // this caller shall not issue target any more ()
+        self->correspondingCaller = callFutureBeforeThen;
+        self->untrackedEventsCount = 0; //to make optimizer happy))
+    }
+};
+
+static_assert(
+    sizeof(EventSlot) == sizeof(EventCallback),
+    "There is a warranty EventSlot costs as corresponding delegate"
+);
+
+
+
 template<class Res, class... Args>
 template<class C>
 class Delegate<Res(Args...)>::BoundDelegateBuilder{
 public:
     //NOTE: it is possible to call both nonconst and const methods on nonconst C
 
-    ///Used by Delegate<Res(Args...)>::Bind(object) to start chained call
+    ///Used by Delegate<Res(Args...)>::From(object) to start chained call
     constexpr BoundDelegateBuilder(C* instanceToCallMethodOn)
         : targetObject(instanceToCallMethodOn) {}
 
     ///Tie method to call on object with that object into Delegate
-    /** Chained call after Delegate<Res(Args...)>::Bind(object)
+    /** Chained call after Delegate<Res(Args...)>::From(object)
      * Place method address as template parameter,
      * use builder Method to create Delegate from class methods
      * (for the case you have ready to use method).
      * NOTE: method is tied statically at compile time */
     template<Res (C::*methodValueAsTemplateParameter)(Args...)>
-    constexpr Delegate Method() const {
+    constexpr Delegate Bind() const {
         return Delegate(
             MakeCallerForMethod<C, methodValueAsTemplateParameter>::apply,
             targetObject
         );
     }
     ///Tie const method to call on object with that object into Delegate
-    /** Chained call after Delegate<Res(Args...)>::Bind(object)
+    /** Chained call after Delegate<Res(Args...)>::From(object)
      * Place method address as template parameter,
      * use builder Method to create Delegate from class methods
      * (for the case you have ready to use method).
      * NOTE: method is tied statically at compile time */
     template<Res (C::*methodValueAsTemplateParameter)(Args...) const>
-    constexpr Delegate Method() const {
+    constexpr Delegate Bind() const {
         return Delegate(
             MakeCallerForConstMethod<C, methodValueAsTemplateParameter>::apply,
             targetObject
@@ -433,26 +570,26 @@ public:
     }
 
     ///Tie free function to call on object with that object into Delegate
-    /** Chained call after Delegate<Res(Args...)>::Bind(object) 
+    /** Chained call after Delegate<Res(Args...)>::From(object) 
      * Place your function address as template parameter,
      * use builder Function to create Delegate from free functions
      * (for the case you do not want to change the original class).
      * NOTE: free function is tied statically at compile time */
     template<Res (*functionValueAsTemplateParameter)(C&, Args...)>
-    constexpr Delegate Function() const {
+    constexpr Delegate Bind() const {
         return Delegate(
             MakeCallerForFunctionWithReference<C, functionValueAsTemplateParameter>::apply,
             targetObject
         );
     }
     ///Tie free const function to call on object with that object into Delegate
-    /** Chained call after Delegate<Res(Args...)>::Bind(object) 
+    /** Chained call after Delegate<Res(Args...)>::From(object) 
      * Place your function address as template parameter,
      * use builder Function to create Delegate from free functions
      * (for the case you do not want to change the original class).
      * NOTE: free function is tied statically at compile time */
     template<Res (*functionValueAsTemplateParameter)(const C&, Args...)>
-    constexpr Delegate Function() const {
+    constexpr Delegate Bind() const {
         return Delegate(
             MakeCallerForFunctionWithConstReference<C, functionValueAsTemplateParameter>::apply,
             targetObject
@@ -460,26 +597,26 @@ public:
     }
 
     ///Tie free function to call on object with that object into Delegate
-    /** Chained call after Delegate<Res(Args...)>::Bind(object) 
+    /** Chained call after Delegate<Res(Args...)>::From(object) 
      * Place your function address as template parameter,
      * use builder Function to create Delegate from free functions
      * (for the case you do not want to change the original class).
      * NOTE: free function is tied statically at compile time */
     template<Res (*functionValueAsTemplateParameter)(C*, Args...)>
-    constexpr Delegate Function() const {
+    constexpr Delegate Bind() const {
         return Delegate(
             MakeCallerForFunctionWithPointer<C, functionValueAsTemplateParameter>::apply,
             targetObject
         );
     }
     ///Tie free const function to call on object with that object into Delegate
-    /** Chained call after Delegate<Res(Args...)>::Bind(object) 
+    /** Chained call after Delegate<Res(Args...)>::From(object) 
      * Place your function address as template parameter,
      * use builder Function to create Delegate from free functions
      * (for the case you do not want to change the original class).
      * NOTE: free function is tied statically at compile time */
     template<Res (*functionValueAsTemplateParameter)(const C*, Args...)>
-    constexpr Delegate Function() const {
+    constexpr Delegate Bind() const {
         return Delegate(
             MakeCallerForFunctionWithConstPointer<C, functionValueAsTemplateParameter>::apply,
             targetObject
@@ -495,20 +632,20 @@ template<class Res, class... Args>
 template<class C>
 class Delegate<Res(Args...)>::BoundDelegateBuilder<const C>{
 public:
-    //NOTE: it is possible to call only const methods on const C
+    //NOTE: it is possible to call ONLY const methods on const C
 
-    ///Used by Delegate<Res(Args...)>::Bind(object) to start chained call
+    ///Used by Delegate<Res(Args...)>::From(object) to start chained call
     constexpr BoundDelegateBuilder(const C* instanceToCallMethodOn)
         : targetObject(instanceToCallMethodOn) {}
 
     ///Tie const method to call on object with that object into Delegate
-    /** Chained call after Delegate<Res(Args...)>::Bind(object)
+    /** Chained call after Delegate<Res(Args...)>::From(object)
      * Place method address as template parameter,
      * use builder Method to create Delegate from class methods
      * (for the case you have ready to use method).
      * NOTE: method is tied statically at compile time */
     template<Res (C::*methodValueAsTemplateParameter)(Args...) const>
-    constexpr Delegate Method() const {
+    constexpr Delegate Bind() const {
         return Delegate(
             MakeCallerForConstMethod<const C, methodValueAsTemplateParameter>::apply,
             targetObject
@@ -516,13 +653,13 @@ public:
     }
 
     ///Tie const free function to call on object with that object into Delegate
-    /** Chained call after Delegate<Res(Args...)>::Bind(object) 
+    /** Chained call after Delegate<Res(Args...)>::From(object) 
      * Place your function address as template parameter,
      * use builder Function to create Delegate from free functions
      * (for the case you do not want to change the original class).
      * NOTE: free function is tied statically at compile time */
     template<Res (*functionValueAsTemplateParameter)(const C&, Args...)>
-    constexpr Delegate Function() const {
+    constexpr Delegate Bind() const {
         return Delegate(
             MakeCallerForFunctionWithConstReference<const C, functionValueAsTemplateParameter>::apply,
             targetObject
@@ -530,13 +667,13 @@ public:
     }
 
     ///Tie const free function to call on object with that object into Delegate
-    /** Chained call after Delegate<Res(Args...)>::Bind(object) 
+    /** Chained call after Delegate<Res(Args...)>::From(object) 
      * Place your function address as template parameter,
      * use builder Function to create Delegate from free functions
      * (for the case you do not want to change the original class).
      * NOTE: free function is tied statically at compile time */
     template<Res (*functionValueAsTemplateParameter)(const C*, Args...)>
-    constexpr Delegate Function() const {
+    constexpr Delegate Bind() const {
         return Delegate(
             MakeCallerForFunctionWithConstPointer<const C, functionValueAsTemplateParameter>::apply,
             targetObject
@@ -579,11 +716,11 @@ class Lambda{};
 
 /* Keep promise to not use any standard libraries by default, 
 Enable defines below to allow standard library instead of own implementation */
-//#define INSTANTARDUINO_USE_STDLIB
-#ifdef INSTANTARDUINO_USE_STDLIB
+//#define InstantRTOS_USE_STDLIB
+#ifdef InstantRTOS_USE_STDLIB
 #   if __has_include(<cstring>)
 #       include <cstring>
-        using std::memcmp
+        using std::memcmp;
 #   else
         //remember, there is no <cstring> header for AVR
 #       include <string.h>
@@ -678,13 +815,8 @@ constexpr Delegate<Res(Args...)>::Delegate(SimpleCaseCallee* simpleCaseCalleeFun
 
 
 template<class Res, class... Args>
-template<class Functor>
-constexpr Delegate<Res(Args...)>
-    Delegate<Res(Args...)>::Unstorable(Functor&& functor)
-{
-    return Delegate(MakeCallerForFunctor<Functor>::apply, &functor);
-}
-
+constexpr Delegate<Res(Args...)>::Delegate(InternalCallerType* caller)
+    : correspondingCaller(caller) {}
 
 template<class Res, class... Args>
 constexpr Delegate<Res(Args...)>::Delegate(
@@ -702,14 +834,14 @@ constexpr Delegate<Res(Args...)>::Delegate(
 template<class Res, class... Args>
 template<class C>
 constexpr typename Delegate<Res(Args...)>::template BoundDelegateBuilder<C>
-Delegate<Res(Args...)>::Bind(C& object){
+Delegate<Res(Args...)>::From(C& object){
     return BoundDelegateBuilder<C>(&object);
 }
 
 template<class Res, class... Args>
 template<class C>
 constexpr typename Delegate<Res(Args...)>::template BoundDelegateBuilder<C>
-Delegate<Res(Args...)>::Bind(C* objectPointer){
+Delegate<Res(Args...)>::From(C* objectPointer){
     return BoundDelegateBuilder<C>(objectPointer);
 }
 
@@ -720,6 +852,16 @@ constexpr Delegate<Res(Args...)>::operator bool() const {
        null as simpleCaseCalleeFunction to constructor */
     return callSimpleCase != correspondingCaller || nullptr != simpleCaseCallee;
 }
+
+
+template<class Res, class... Args>
+template<class Functor>
+constexpr Delegate<Res(Args...)>
+    Delegate<Res(Args...)>::Unstorable(Functor&& functor)
+{
+    return Delegate(MakeCallerForFunctor<Functor>::apply, &functor);
+}
+
 
 template<class Res, class... Args>
 constexpr bool Delegate<Res(Args...)>::operator <(const Delegate& other) const{
@@ -748,6 +890,7 @@ constexpr Res Delegate<Res(Args...)>::callSimpleCase(const Delegate* self, Args.
 }
 
 
+
 template<class Res, class... Args>
 constexpr int Delegate<Res(Args...)>::cmpTo(const Delegate& other) const{
     static_assert(
@@ -755,12 +898,23 @@ constexpr int Delegate<Res(Args...)>::cmpTo(const Delegate& other) const{
         "Comparison will not work if sizes are different"
     );
     static_assert(
-        sizeof(Delegate::theCalleeAsObject) + sizeof(Delegate::simpleCaseCallee)
-        == sizeof(Delegate),
-        "Comparison will not work if sizes are different"
+        sizeof(Delegate::theCalleeAsObject) == sizeof(Delegate::theCalleeAsConstObject),
+        "Comparison will not work if pointer sizes are different"
     );
 
-#ifdef INSTANTARDUINO_USE_STDLIB
+    static_assert(
+        sizeof(Delegate::theCalleeAsObject) + sizeof(Delegate::simpleCaseCallee)
+        == sizeof(Delegate),
+        "Comparison will not work if fields do not occupy full Delegate instance"
+    );
+
+    //relax condition for callsCountBeforeInitialization (but comparing futures is undefined)
+    static_assert(
+        sizeof(Delegate::theCalleeAsObject) >= sizeof(Delegate::callsCountBeforeInitialization),
+        "Comparison will not work if sizes do not fit"
+    );
+
+#ifdef InstantRTOS_USE_STDLIB
     static_assert(sizeof(int) > 1, "This function is not -mint8 compatible!");
     return memcmp(this, &other, sizeof(Delegate));
 #else

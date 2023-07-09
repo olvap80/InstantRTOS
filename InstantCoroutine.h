@@ -93,6 +93,10 @@
 
     This can serve as C++ coroutines for embedded platforms (like Arduino)
 
+    On why "native C++20 coroutines" are not suitable for embedded, see:
+    https://probablydance.com/2021/10/31/c-coroutines-do-not-spark-joy/
+    (remember InstantCoroutine works in C++11 which is default for Arduino))
+
     MIT License
 
     Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
@@ -120,10 +124,13 @@
 #define InstantCoroutine_INCLUDED_H
 
 
-#ifndef InstantCoroutinePanic
-    ///Special case to handle coroutine in unexpected state
-    /** NOTE: coroutine used after completion also falls here */
-#   define InstantCoroutinePanic() /* TODO: your custom action here! */ for(;;){}
+//NOTE: coroutine used after completion also falls here
+#ifndef InstantCoroutine_Panic
+#   ifdef InstantCoroutine_Panic
+#       define InstantCoroutine_Panic() InstantRTOS_Panic("C")  
+#   else
+#       define InstantCoroutine_Panic() /* you can customize here! */ do{}while(true)
+#   endif
 #endif
 
 
@@ -162,7 +169,7 @@
 
 /// End coroutine body (corresponds to CoroutineBegin)
 #define CoroutineEnd() \
-                default: InstantCoroutinePanic(); \
+                default: InstantCoroutine_Panic(); \
             } \
         } \
     public:

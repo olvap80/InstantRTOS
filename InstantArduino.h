@@ -50,7 +50,7 @@
 
 // The simplest possible portable scheduler suitable for embedded 
 // platforms like Arduino (actually only standard C++ is required)
-//#include "InstantScheduler.h"
+#include "InstantScheduler.h"
 
 
 // Memory and queueing _________________________________________________________
