@@ -17,30 +17,65 @@ Here "Instant" stands to the ability to use InstantRTOS parts and patterns immed
 ## Why another RTOS?
 This is fun)) The idea is to create a RTOS made of ligtweight parts, that can be easy moved around.
 
-## Why C++?
-Because "true man on embedded use bare C and assembler" is a myth!
 
-C requires too much boilerplate code aroud, 
-C++ was unfameous for embedded because of prejudice caused by some space and time consuming language/runtime features,
-But once those features are cut off it is as efficient as C by code execution time and binary size.
+## Is InstantRTOS ready to use?
+Development is still in progress but some parts like
+[Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h), 
+[Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h),
+[Scheduler](https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h)
+can be immediately used independently of other parts.
+Just copy the parts you need directly into your project)).
 
-The most fameous platform known for using C++ is Arduino, and C++ fits perfectly even into their simplest board/CPU requirements.
 
-## Is it ready to use?
+## Why not <programming_langulage_name> for RTOS instead of C++?
+Googling in the area of embedded programming leads to answers in C and it is easy to integrate from C++ than from any other language.
 
-Development is still in progress but some parts like Delegates, Coroutines, Scheduler can be used independently of other parts.
-Just copy the parts you need directly into your project.
+Embedded is still around C (and C++), any "exotic" languages are hard to integrate with "plain old C"))
+Those "exotic" languages usually have big runtime, undeterminiscic garbage collection, 
+or are not popular enough to have compiler for every platform (and instructions on "how to setup them" are not as easy as for "classics").  
+
+**You can use C header files (and libraries) directly from C++ AS IS**, without all those pains of "foreign function interfeces", "marshalling", etc.!
+
+
+## Then why C++, why not C?
+Think of C++ as "advanced C" for a moment))
+"Plain" C requires too much boilerplate code aroud simple things. 
+All those "OOP in C stuff", where every "embedded guru" invents own "right way" and fancy conventions to do all the boilerplate are **not fun** 
+(and "true man on embedded use bare C and assembler" is a myth!)
+ 
+C++ was unfameous for embedded because of prejudice caused by some space and time consuming language/runtime features.
+But once those features are cut off it is as efficient as C by code execution time and by binary size (and much easier to develop!).
+
+The most fameous embedded platform known for using C++ is Arduino, and C++ fits perfectly even into requirements for their simplest board/CPU.
+Remomber: all the fears around C++ are well known, but they are easy to google and are easy to find solution :)
+
+
+## Why Coroutines in C++11? What about C++20 coroutines?
+Because of [this](https://probablydance.com/2021/10/31/c-coroutines-do-not-spark-joy/)
+
+TBD
+
 
 ## Where is HAL? What about registers and periperals?
-
 Delegates and Coroutines are pure standard C++11, they do not depend on platform at all.
 
-The idea of Scheduler and timers is around calling Sheduler from infinite loop with providing updeted time value.
-Scheduler takes care 
+The idea of Scheduler and timers is straight forward: just calling Sheduler from infinite loop with updated time value
+(the most RTOS actually do the same, some of them provide API to detect "idle" state, and it is still up to you to invent behavior for this)).
+
+Scheduler takes care of accounting time, you shall only provide new time measurerements!
+It is up to you to choose time measurement units (seconds, milliseconds, some other hardware "ticks"),
+you can even have multiple shedulers using different time unints if you need.
 
 ## What about battery
 
-TODO
+Calling scheduler from infinite loop is not a very efficient way to save battery in any OS.
+After a call to Scheduler::ExecuteOne or Scheduler::ExecuteAll it is possible to query Scheduler for the next schedule time with
+```cpp
+bool Scheduler::HasNextTicks(Ticks* writeTo) const;
+```
+and then put your device into Deep Sleep or Light Sleep for that time dependong on your needs.
+
+Design note: it would be irrational to embed all the possible Deep Sleep or Light Sleep strategies into the RTOS (and other RTOS'es also do not))
 
 # Features
 ## General utility headers
