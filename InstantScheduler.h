@@ -322,7 +322,9 @@ private:
 /// The simplest possible Scheduler for arranging actions in time
 /** You shall invoke ExecuteAll or ExecuteOne frequent enough to
  * have desired precision.
- * Use HasNextTicks to find the time of next schedule! */
+ * For saving battery use HasNextTicks to find the time of next schedule,
+ * (one can implement different sleep strategy depending on known 
+ *  schedule time to find the next time device shall wake up)! */
 class Scheduler{
 public:
     //all the copying is banned (this ensures pointers are valid)
@@ -357,8 +359,14 @@ public:
     
 
     /// Obtain when next event is going to happen
-    /** \returns true if there are  */
+    /** \returns true if there is next time moment known
+     *           false if there is no scheduled moment at all */
     bool HasNextTicks(Ticks* writeTo) const;
+
+    /// Obtain absolute ticks currently known to the Scheduler
+    /** Value stands for the last known value being delivered either with
+     * ExecuteOne or with ExecuteAll. */
+    Ticks KnownAbsoluteTicks() const;
 
 #   ifdef InstantScheduler_StatisticsCollection
         /* Remember: scheduler does not measure time, instead
@@ -785,6 +793,10 @@ inline bool Scheduler::HasNextTicks(Ticks* writeTo) const{
         InstantScheduler_LeaveCritical
     }
     return hasTicks;
+}
+
+inline Scheduler::Ticks Scheduler::KnownAbsoluteTicks() const{
+    return knownAbsoluteTicks;
 }
 
 

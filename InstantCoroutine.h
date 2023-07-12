@@ -139,7 +139,7 @@
  * NOTE: all fields are private by default!
  * NOTE: one can place fields (and constructors!) inside {}, see sample above */
 #define CoroutineDefine(coroutineClassName) \
-    class coroutineClassName: public CppCoroutineBase<COROUTINE_PLACE_COUNTER>
+    class coroutineClassName: public CppCoroutineBase
 
 /// Coroutine body follows this macro (coroutine is initially suspended!)
 /** One shall specify return type or void as the first parameter,
@@ -151,8 +151,11 @@
     public: \
         /* Just call coroutine object with () to resume the coroutine */ \
         coroutineResultType operator()(__VA_ARGS__) { \
-            switch( cppCoroutineState ){ \
-                case CppCoroutineStateInitial:;
+        static constexpr CppCoroutineState_Holder CppCoroutineState_COUNTER_START = \
+                                                            COROUTINE_PLACE_COUNTER; \
+            switch( cppCoroutineState_Current ){ \
+                /* The very first time */\
+                case CppCoroutineState_Initial:;
 
 /// Yield to caller (with value if coroutineResultType was not void)
 /** Remember state and suspend execution
@@ -160,12 +163,15 @@
  *  NOTE: one cannot place CoroutineYield inside switch statement
  *  NOTE: one can specify return values for resumable coroutines */
 #define CoroutineYield(...) \
-    COROUTINE_YIELD_FROM(COROUTINE_PLACE_COUNTER, __VA_ARGS__)
+    COROUTINE_YIELD_FROM(\
+        (CppCoroutineState_Initial + (COROUTINE_PLACE_COUNTER - CppCoroutineState_COUNTER_START)), \
+        __VA_ARGS__ \
+    )
 
 ///The "the last return" from the coroutine
 /** Once stopped it will be not resumable again */
 #define CoroutineStop(lastRVal) \
-    do { cppCoroutineState = CppCoroutineStateFinal; return lastRVal; } while (false)
+    do { cppCoroutineState_Current = CppCoroutineState_Final; return lastRVal; } while (false)
 
 /// End coroutine body (corresponds to CoroutineBegin)
 #define CoroutineEnd() \
@@ -187,8 +193,7 @@
 
 ///Common base for all coroutine classes
 /** NOTE: copying is not banned, copy will duplicate entire state
- *        let uses decide if he wants lifetime to be copied */
-template<int stateStartsFrom>
+ *        let user to decide if he wants lifetime to be copied */
 class CppCoroutineBase{
     public:
         ///Test coroutine did not finish (CoroutineStop was NOT called)
@@ -198,42 +203,47 @@ class CppCoroutineBase{
 
         ///Test coroutine finished (CoroutineStop was called)
         bool Finished() const {
-            return CppCoroutineStateFinal == cppCoroutineState;
+            return CppCoroutineState_Final == cppCoroutineState_Current;
         }
 
     protected:
-        ///Type for state
-        /** Assume our __LINE__ will never go beyond */
-        using CppCoroutineStateHolder = short;
-        ///Maximum state for static_assert ))
-        /** Compute assuming two's complement */
-        static const CppCoroutineStateHolder CppCoroutineStateHolderMax =
-            ((1 << (sizeof(CppCoroutineStateHolder)*8 - 2)) - 1) * 2 + 1;
-
-        ///Always start from this state
-        static const CppCoroutineStateHolder CppCoroutineStateInitial = stateStartsFrom;
-        ///The final state we cannot continue from
-        static const CppCoroutineStateHolder CppCoroutineStateFinal = CppCoroutineStateInitial-1;
-
-        ///State where that coroutine is paused/stopped
-        CppCoroutineStateHolder cppCoroutineState = CppCoroutineStateInitial;
-
         ///For use from derived classes only
         CppCoroutineBase() = default;
+
+        ///Type for state
+        /** Assume our __LINE__ will never go beyond */
+        using CppCoroutineState_Holder = unsigned short;
+        ///Maximum state for static_assert ))
+        /** Compute assuming two's complement for unsigned)) */
+        static constexpr CppCoroutineState_Holder CppCoroutineState_HolderRangeMax =
+                                                ~CppCoroutineState_Holder(0);
+
+        ///The final state we cannot continue from
+        static constexpr CppCoroutineState_Holder CppCoroutineState_Final = CppCoroutineState_HolderRangeMax;
+        ///Always start from this state
+        static constexpr CppCoroutineState_Holder CppCoroutineState_Initial = 0;
+        
+
+        ///State where that coroutine is paused/stopped
+        CppCoroutineState_Holder cppCoroutineState_Current = CppCoroutineState_Initial;
 };
 
 
 ///Ensure macro argument is expanded before being used
 /** See https://gcc.gnu.org/onlinedocs/cpp/Argument-Prescan.html
  * and https://gcc.gnu.org/onlinedocs/cppinternals/Macro-Expansion.html */
-#define COROUTINE_EXPANd_MACRO(macro) macro
+#define COROUTINE_EXPAND_MACRO(macro) macro
 
-///Helper macro to form
+///Helper macro to form state saving/resume point
 #define COROUTINE_YIELD_FROM(cppCoroutine_place_id, ...) \
     do{ \
-        static_assert(cppCoroutine_place_id > CppCoroutineStateInitial, "COROUTINE_PLACE_COUNTER is broken"); \
-        static_assert(cppCoroutine_place_id < CppCoroutineStateHolderMax, "Mapping lines to state is broken"); \
-        cppCoroutineState = cppCoroutine_place_id; \
+        static_assert(\
+            cppCoroutine_place_id > CppCoroutineState_Initial,\
+            "cppCoroutine_place_id (COROUTINE_PLACE_COUNTER) is broken"); \
+        static_assert(\
+            cppCoroutine_place_id < CppCoroutineState_HolderRangeMax,\
+            "Mapping lines to state is broken"); \
+        cppCoroutineState_Current = cppCoroutine_place_id; \
         return __VA_ARGS__; \
         case cppCoroutine_place_id:; \
     } while (false)
@@ -246,9 +256,9 @@ class CppCoroutineBase{
     // and https://nanxiao.me/en/__counter__-macro-in-gcc-clang/
     // and https://wwwfiles.iar.com/arm/webic/doc/EWARM_DevelopmentGuide.ENU.pdf
 
-#   define COROUTINE_PLACE_COUNTER COROUTINE_EXPANd_MACRO(__COUNTER__)
+#   define COROUTINE_PLACE_COUNTER COROUTINE_EXPAND_MACRO(__COUNTER__)
 #else
-#   define COROUTINE_PLACE_COUNTER COROUTINE_EXPANd_MACRO(__LINE__)
+#   define COROUTINE_PLACE_COUNTER COROUTINE_EXPAND_MACRO(__LINE__)
 #endif
 
 #endif

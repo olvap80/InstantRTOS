@@ -28,7 +28,7 @@
 
         void loop() {
 
-            Serial.println(F("\n------------- Iteraton -------------"));
+            Serial.println(F("\n------------- Iteration -------------"));
 
             // put your main code here, to run repeatedly:
             IntrusiveList<MyTestItem> il;
