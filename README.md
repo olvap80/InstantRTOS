@@ -53,9 +53,11 @@ Remomber: all the fears around C++ are well known, but they are easy to google a
 
 
 ## Why Coroutines in C++11? What about C++20 coroutines?
-Because of [this](https://probablydance.com/2021/10/31/c-coroutines-do-not-spark-joy/)
+Because of [THIS](https://probablydance.com/2021/10/31/c-coroutines-do-not-spark-joy/),
+requiiring dunamic memory allocation for the thing with known (at the momont of creation) size is too drastic
+for small embedded platforms.
 
-Simplest [Coroutine in InstantRTOS](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) 
+In contrast the simplest [Coroutine in InstantRTOS](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) 
 requires only sizeof(short) for holding own state and no dynamic memory allocation.
 
 
