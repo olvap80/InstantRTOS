@@ -1,5 +1,6 @@
 # [InstantRTOS](https://github.com/olvap80/InstantRTOS) simple lightweight RTOS + utility for embedded platforms
-Header-only, mimimalistic real time operating system, with fast and handy utility classes, without any dependencies.
+Header-only, minimalistic real time operating system, with fast and handy utility classes, without any dependencies.
+Easy to use, simpe and intiitive.
 Here word "Instant" stands to the ability for using InstantRTOS parts and patterns immediately (even if you have another RTOS runnung, you can run InstantRTOS from that RTOS))
 
 # Features
@@ -62,9 +63,14 @@ requires only sizeof(short) for holding own state and no dynamic memory allocati
 
 
 ## Where is HAL? What about registers and periperals?
+The main components of InstantRTOS do not depend on any hardware and platform specifics at all, here is why:
+
 Delegates(https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h)
 and Coroutines(https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h)
 are pure standard C++11, they do not depend on any platform at all.
+These can be used both on embedded platforms (like Arduino) and on desktop (Windows, Linux).
+Delegates(https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h)
+and Coroutines(https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) in InstantRTOS are resource friendly and avoid heap usage. 
 
 The idea of [Scheduler](https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h)
 and [timers](https://github.com/olvap80/InstantRTOS/blob/main/InstantTimer.h) is straight forward: just calling Sheduler from infinite loop with updated time value
@@ -74,9 +80,8 @@ Scheduler takes care of accounting time, you shall only provide new time measure
 It is up to you to choose time measurement units (seconds, milliseconds, some other hardware "ticks"),
 you can even have multiple shedulers using different time unints if you need.
 
-## What about battery
-
-Calling scheduler from infinite loop is not a very efficient way to save battery in any OS.
+## What about saving battery and minimizing power consumption?
+It looks like calling scheduler from infinite loop is not a very efficient way to save battery in any OS.
 After a call to Scheduler::ExecuteOne or Scheduler::ExecuteAll it is possible to query Scheduler(https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h) for the next schedule time with
 ```cpp
 /// Obtain when next event is going to happen
@@ -85,16 +90,17 @@ After a call to Scheduler::ExecuteOne or Scheduler::ExecuteAll it is possible to
 bool Scheduler::HasNextTicks(Ticks* writeTo) const;
 ```
 and then (dependong on your needs) put your device into Deep Sleep or Light Sleep until that time is reached.
+Once next schedule time is known, one can apply own unique efficient stratedy for power saving, depending on wait time needed.
 
 Design note: it would be irrational to embed all the possible Deep Sleep or Light Sleep strategies into the RTOS 
-(and other RTOS'es also do not)). Use Scheduler::HasNextTicks to make your own decision. 
+(and other RTOS'es also do not)), so it is possible to use Scheduler::HasNextTicks to make your own decision. 
 
 # Features implemented so far
 ## General utility headers
 
 - [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) - Fast deterministic delegates for invoking callbacks, suitable for real time operation (no heap allocation at all)
 
-- [InstantCoroutine.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) - Simple minimalistic coroutines suitable for all various platforms (like Arduino!) for the case when native C++ coroutines are too heavyweight (or when co_yield and stuff does not work)).
+- [InstantCoroutine.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) - Simple minimalistic coroutines suitable for all various platforms (like Arduino!) for the case when native C++ coroutines are too heavyweight (or when co_yield and stuff does not work)). Works starting from C++11 (so this can be considered as a nice coroutine inplementation for Arduino, as Arduino uses C++11 by default))
 
 ## Timing, intervals and scheduling
 
@@ -115,4 +121,4 @@ Design note: it would be irrational to embed all the possible Deep Sleep or Ligh
 - InstantSignals.h (in progress) - Handle hardware signals being mapped to memory
 
 # Future plans
-TODO (still invented)
+TODO (still being invented)
