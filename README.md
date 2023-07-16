@@ -38,7 +38,7 @@ Embedded is still around C (and C++), any "exotic" languages are hard to integra
 Those "exotic" languages usually have big runtime, non deterministic garbage collection, 
 or are not popular enough to have a compiler (and wrappers) for every platform (and instructions on "how to setup them" are not as easy as for "classics").  
 
-**You can use C header files (and libraries) of your platform directly from C++ AS IS**, without all those pains of "foreign function  interfaces", "marshaling", etc.!
+**You can use C header files (and libraries) of your platform directly from C++ AS IS**, without all those pains of "foreign function interfaces", "marshaling", etc.!
 Embedded systems, usually ship with C headers, rewriting data structures enumarations and function prototypes from them in a frapper for &lt;exotic_programming_langulage&gt; is pain!
 Supporting such integration libraries to be in sync with original C code is pain
 (unlsess someone else is doing that for you on regular basis, but they do not! and even then their wrappers stay mostly undocumented,
@@ -54,7 +54,7 @@ All those "OOP in C stuff", when every "embedded guru" invents own "the right wa
 C++ integrates with C shoothly, but was "not welcome" by for embedded due prejudice caused by some space and time consuming language/runtime features.
 But once those features are cut off, C++ is as efficient as C by code execution time and by binary size (and much easier to develop!).
 
-The most famous embedded platform known for using C++ is Arduino, and C++ fits perfectly even into requirements for their simplest board/CPU.
+The most famous embedded platform known for using C++ is Arduino, and C++ fits perfectly even into requirements for their simplest board/CPU (yep, C++ copliles even on AVR).
 Remember: all the fears around C++ are well known, but they are easy to google and are easy to find solutions :)
 
 
@@ -68,7 +68,6 @@ requires only sizeof(short) for holding own state and no dynamic memory allocati
 
 InstantRTOS implements low-memory, fast-switching statckless coroutines to do cooperative multitasking efficienly on any platform.
 Coroutines are nice structural replacement for finite state machines (FSMs), since natural flow control statements are used instead of the mess of state/event transitions.
-
 
 
 ## Where is HAL? What about registers and peripherals?
@@ -89,6 +88,16 @@ and [timers](https://github.com/olvap80/InstantRTOS/blob/main/InstantTimer.h) is
 It is up to you to choose time measurement units (seconds, milliseconds, some other hardware "ticks"),
 you can even have multiple schedulers using different time units if you need.
 
+
+## How to take CPU into account? 
+InstantRTOS is CPU independent but you can use all your CPU fuatures with it!
+You can post to queues and schedule tasks from interrupts when InstantRTOS_EnterCritical and InstantRTOS_LeaveCritical are defined.
+Those macro are also applicable when two RTOSes (InstantRTOS and some other) coexist together. 
+Those macro are the only CPU dependency, but you do not need them when you do not use "advanced features" described above.
+
+## What about configuring InstantRTOS per my needs?
+See TBD document for tutorial on details.
+
 ## What about saving battery and minimizing power consumption?
 It looks like calling scheduler from infinite loop is not a very efficient way to save battery in any OS.
 After a call to Scheduler::ExecuteOne or Scheduler::ExecuteAll it is possible to query Scheduler(https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h) for the next schedule time with
@@ -103,6 +112,12 @@ Once next schedule time is known, one can apply own unique efficient strategy fo
 
 Design note: it would be irrational to embed all the possible Deep Sleep or Light Sleep strategies into the RTOS 
 (and other RTOS'es also do not)), so it is possible to use Scheduler::HasNextTicks to make your own decision. 
+
+## Hey, why PascalCase?
+To make InstantRTOS code not look like any other "coding style applicable for embedded", seriously:
+- There will be no name clashes with other RTOS and their types, defines and macros!
+- InstantRTOS API call insertions will be visible and distinct from other API calls...
+- All those "k" prefixes and "_S" suffixes are useless!
 
 # Features implemented so far
 ## General utility headers
