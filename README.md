@@ -31,24 +31,28 @@ can be immediately used independently of other parts.
 Just copy the parts you need directly into your project)).
 
 
-## Why not <programming_langulage_name> for RTOS instead of C++?
-Googling in the area of embedded programming leads to answers in C and it is easy to integrate from C++ than from any other language.
+## Why not &lt;programming_langulage_name&gt; for RTOS instead of C++?
+Googling in the area of embedded programming leads to answers in C and it is more easy to integrate from C++ than from any other language.
 
 Embedded is still around C (and C++), any "exotic" languages are hard to integrate with "plain old C"))
 Those "exotic" languages usually have big runtime, non deterministic garbage collection, 
-or are not popular enough to have a compiler for every platform (and instructions on "how to setup them" are not as easy as for "classics").  
+or are not popular enough to have a compiler (and wrappers) for every platform (and instructions on "how to setup them" are not as easy as for "classics").  
 
-**You can use C header files (and libraries) directly from C++ AS IS**, without all those pains of "foreign function  interfaces", "marshaling", etc.!
+**You can use C header files (and libraries) of your platform directly from C++ AS IS**, without all those pains of "foreign function  interfaces", "marshaling", etc.!
+Embedded systems, usually ship with C headers, rewriting data structures enumarations and function prototypes from them in a frapper for &lt;exotic_programming_langulage&gt; is pain!
+Supporting such integration libraries to be in sync with original C code is pain
+(unlsess someone else is doing that for you on regular basis, but they do not! and even then their wrappers stay mostly undocumented,
+so you still have to dig original C cenrtic documentation and C code)
 
 
 ## Then why C++, why not C?
 Think of C++ as "advanced C" for a moment))
 "Plain" C requires too much boilerplate code aroud simple things. 
-All those "OOP in C stuff", where every "embedded guru" invents own "right way" and fancy conventions to do all the boilerplate are **not fun** 
+All those "OOP in C stuff", when every "embedded guru" invents own "the right way" and fancy conventions to do all the boilerplate are **not fun** 
 (and "true man on embedded use bare C and assembler" is a myth!)
  
-C++ was "not welcome" for embedded because of prejudice caused by some space and time consuming language/runtime features.
-But once those features are cut off C++ is as efficient as C by code execution time and by binary size (and much easier to develop!).
+C++ integrates with C shoothly, but was "not welcome" by for embedded due prejudice caused by some space and time consuming language/runtime features.
+But once those features are cut off, C++ is as efficient as C by code execution time and by binary size (and much easier to develop!).
 
 The most famous embedded platform known for using C++ is Arduino, and C++ fits perfectly even into requirements for their simplest board/CPU.
 Remember: all the fears around C++ are well known, but they are easy to google and are easy to find solutions :)
@@ -61,6 +65,10 @@ for small embedded platforms.
 
 In contrast the simplest [Coroutine in InstantRTOS](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) 
 requires only sizeof(short) for holding own state and no dynamic memory allocation.
+
+InstantRTOS implements low-memory, fast-switching statckless coroutines to do cooperative multitasking efficienly on any platform.
+Coroutines are nice structural replacement for finite state machines (FSMs), since natural flow control statements are used instead of the mess of state/event transitions.
+
 
 
 ## Where is HAL? What about registers and peripherals?
