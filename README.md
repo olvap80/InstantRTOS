@@ -73,12 +73,12 @@ Coroutines are nice structural replacement for finite state machines (FSMs), sin
 ## Where is HAL? What about registers and peripherals?
 The main components of InstantRTOS do not depend on any hardware/platform/CPU specifics at all, here is why:
 
-Delegates(https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h)
-and Coroutines(https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h)
+[Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h)
+and [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h)
 are pure standard C++11, they do not depend on any platform at all.
 These can be used both on embedded platforms (like Arduino) and on desktop (Windows, Linux).
-Delegates(https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h)
-and Coroutines(https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) in InstantRTOS are resource friendly and avoid heap usage. 
+[Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h)
+and [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) in InstantRTOS are resource friendly and avoid heap usage. 
 
 The idea of [Scheduler](https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h)
 and [timers](https://github.com/olvap80/InstantRTOS/blob/main/InstantTimer.h) is straight forward: just calling Sheduler from infinite loop with updated time value
@@ -117,7 +117,8 @@ Design note: it would be irrational to embed all the possible Deep Sleep or Ligh
 To make InstantRTOS code not look like any other "coding style applicable for embedded", seriously:
 - There will be no name clashes with other RTOS and their types, defines and macros!
 - InstantRTOS API call insertions will be visible and distinct from other API calls...
-- All those "k" prefixes and "_S" suffixes are useless!
+- All those "k" prefixes and "_S" suffixes are useless! C++ compilers (and IDE) are smart enough to not call enum instead of function or assign structure to int))
+
 
 # Features implemented so far
 ## General utility headers
