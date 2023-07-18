@@ -3,7 +3,7 @@ Header-only, minimalistic real time operating system, with fast and handy utilit
 Easy to use, simple and intuitive.
 Here word "Instant" stands to the ability for using InstantRTOS parts and patterns immediately (even if you have another RTOS running, you can run InstantRTOS from that RTOS))
 
-# Features
+# Features and goals
 - Written in C++ 11, suitable to work even on small embedded platforms, like Arduino (yes Arduino actually uses C++! and yes, it is possible to write RTOS in C++).
 - No dependencies (even no standard headers needed) by default.
 - Only standard C++ (does not depend on any platform specifics).
@@ -16,11 +16,13 @@ Here word "Instant" stands to the ability for using InstantRTOS parts and patter
 # Frequently Asked Questions
 
 ## Why another RTOS?
-This is fun)) The idea is to create a RTOS made of lightweight parts that can be easily moved around.
+This is fun)) The idea is to create a RTOS in C++ being made of lightweight parts that can be easily moved around.
 Also I like header-only libraries, so simple header-only RTOS is definitely my best option...
 
 
 ## Is InstantRTOS ready to use?
+(For the list of ready stuff see [below](#features-implemented-so-far))
+
 Development is still in progress but some universal parts like
 [Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h), 
 [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h)
@@ -46,7 +48,7 @@ so you still have to dig original C cenrtic documentation and C code)
 
 
 ## Then why C++, why not C?
-Think of C++ as "advanced C" for a moment))
+Think of C++ as "advanced C" for a moment)) RAII is the must-have feature!
 "Plain" C requires too much boilerplate code aroud simple things. 
 All those "OOP in C stuff", when every "embedded guru" invents own "the right way" and fancy conventions to do all the boilerplate are **not fun** 
 (and "true man on embedded use bare C and assembler" is a myth!)
@@ -69,6 +71,23 @@ requires only sizeof(short) for holding own state and no dynamic memory allocati
 InstantRTOS implements low-memory, fast-switching statckless coroutines to do cooperative multitasking efficienly on any platform.
 Coroutines are nice structural replacement for finite state machines (FSMs), since natural flow control statements are used instead of the mess of state/event transitions.
 
+
+## What about preemption of tasks?
+Preemption of "threads of execution" by "other threads of execution" is the feature that leads to mutexes and semaphores, CAS and memory barriers...
+this compicates programming a lot (and hurts CPU parformance!).
+Context switches are bad (both by time to switch, misses in CPU cache, and by space used for multiple stacks and for storing CPU contexts),
+and context switches are not portable at all!
+
+So regarding preemption: "not yet", but is it really always needed?
+"True man use preemption", that is why "Active Objects" and "run to completion" was invented (to overcome syncronization troubles caused by preemption!)
+Once "each Active Object handles one event at a time" and "runs to completion" this looks like... single threaded execution on single CPU!
+And with single physical CPU (like AVR on Arduino) our "tasks" do not run "in parallel", and so doing "true" preemption with CPU context switching leads to... CPU time and memory space lost!
+
+The only real case when preemption is needed is to let "the more important task to interrupt the less important task", this leads us to next section about priorities.  
+
+
+## Then what about task priorities?
+TBD on planning and multiple schedulers and on workarounds!
 
 ## Where is HAL? What about registers and peripherals?
 The main components of InstantRTOS do not depend on any hardware/platform/CPU specifics at all, here is why:
