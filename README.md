@@ -135,7 +135,7 @@ To make InstantRTOS code not look like any other "coding style applicable for em
 
 ## Memory and queueing
 
-- InstantMemory.h (TODO) - Simple deterministic memory management utilities suitable for real time can be used for fast and deterministic memory allocations on Arduino and similar platforms.
+- [InstantMemory.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantMemory.h) - Simple deterministic memory management utilities (block pools, lifetime management, TBD) suitable for real time, can be used for fast and deterministic memory allocations on Arduino and similar platforms.
 
 - InstantQueue.h (in progress) - Simple deterministic queues suitable for real time TBD.
 
