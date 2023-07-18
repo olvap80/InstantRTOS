@@ -73,10 +73,9 @@ Coroutines are nice structural replacement for finite state machines (FSMs), sin
 
 
 ## What about preemption of tasks?
-Preemption of "threads of execution" by "other threads of execution" is the feature that leads to mutexes and semaphores, CAS and memory barriers...
+Multiple "threads of execution" is the feature leading us to mutexes and semaphores, CAS and memory barriers...
 this compicates programming a lot (and hurts CPU parformance!).
-Context switches are bad (both by time to switch, misses in CPU cache, and by space used for multiple stacks and for storing CPU contexts),
-and context switches are not portable at all!
+Context switches for "true" preemption “threads of execution” by “other threads of execution” on the same CPU are bad (both by time to switch, misses in CPU cache, and by space used for multiple stacks and for storing CPU contexts). Context switches are not portable at all!
 
 So regarding preemption: "not yet", but is it really always needed?
 "True man use preemption", that is why "Active Objects" and "run to completion" was invented (to overcome syncronization troubles caused by preemption!)
