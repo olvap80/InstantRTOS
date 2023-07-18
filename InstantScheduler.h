@@ -72,7 +72,9 @@
 #   define InstantScheduler_Ticks_Type unsigned long
 #endif
 
-//This will be used in the future
+/* Tuning optional support for scheduling from interrupts,
+   or event from threads of other RTOS running in parallel ))
+   (just leave as is if interrupts/other RTOS are not used) */
 #ifndef InstantScheduler_EnterCritical
 #   ifdef InstantRTOS_EnterCritical
 #       define InstantScheduler_EnterCritical InstantRTOS_EnterCritical

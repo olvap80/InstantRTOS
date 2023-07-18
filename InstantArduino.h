@@ -1,5 +1,9 @@
 /** @file InstantArduino.h 
     @brief Common Arduino centric include
+            (and a nice sample on how InstantRTOS is integrated)
+
+    Include this file to have "every supported stuff" on Arduino.
+    Edit defaults to anything you like/need for your project. 
 
     MIT License
 
@@ -27,53 +31,35 @@
 #ifndef InstantArduino_INCLUDED_H
 #define InstantArduino_INCLUDED_H
 
-// Main include file for the Arduino SDK (makes vscode hints happy)
+// Main include file for the Arduino SDK (this also makes vscode hints happy)
 #include "Arduino.h"
 
+#define InstantRTOS_TryAllowCritical
 
-// General utility headers _____________________________________________________
+//TODO: move that logic to InstantTryCPU.h ))
+#ifdef InstantRTOS_TryAllowCritical
+#   if __has_include(<util/atomic.h>)
+#       include <util/atomic.h>
+#       define InstantRTOS_EnterCritical ATOMIC_BLOCK(ATOMIC_RESTORESTATE){
+#       define InstantRTOS_LeaveCritical }
+#   elif defined(xt_rsil)
+#       define InstantRTOS_EnterCritical { uint32_t saved_iterrupts = xt_rsil(15)
+#       define InstantRTOS_LeaveCritical xt_wsr_ps(saved_iterrupts)}
+#   elif defined(interrupts)
+        /* It is not the best option to always enable interrupts (from interrupt)
+           but here we have the last hope to do something meaningful */
+#   else
+    //TODO: write your own here ))
+#   endif
 
-// Simple minimalistic coroutines suitable for all various platforms 
-// (like Arduino!) for the case when native C++ coroutines are too heavyweight
-// (or when co_yield and stuff does not work)
-#include "InstantCoroutine.h"
-
-// Fast deterministic delegates for invoking callbacks,
-// suitable for real time operation (no heap allocation at all)
-#include "InstantDelegate.h"
-
-
-// Timing, intervals and scheduling ____________________________________________
-
-// Simple timing classes to track timings in platform independent way
-#include "InstantTimer.h"
-
-// The simplest possible portable scheduler suitable for embedded 
-// platforms like Arduino (actually only standard C++ is required)
-#include "InstantScheduler.h"
+#endif
 
 
-// Memory and queueing _________________________________________________________
-
-// Simple deterministic memory management utilities suitable for real time
-// can be used for dynamic memory allocations on Arduino and similar platform
-//#include "InstantMemory.h"
-
-// Simple deterministic queues suitable for real time
-// can be used for dynamic memory allocations on Arduino and similar platforms.
-//#include "InstantQueue.h"
+// TODO: Arduino specific error processing
 
 
-// Other handy utility stuff ___________________________________________________
-
-// General debouncing, see ArduinoDebounce below
-#include "InstantDebounce.h"
-
-//Handle hardware signals being mapped to memory
-//#include "InstantSignals.h"
-
-
-
+// Add all InstantRTOS headers at once
+#include "InstantRTOS.h"
 
 
 #endif

@@ -9,7 +9,7 @@
     Lightweight coroutines are implemented as easy to use C++ functor classes.
     Use coroutines instead of writing explicit finite state machines.
 
-    Implemented as stackless coroutines, own coroutine state is only two bytes,
+    Implemented as stackless coroutines, own coroutine state is only two bytes on AVR,
     one can add any custom state variables that turn to class fields.
 
     Example Usage (generate sequences):
@@ -17,7 +17,8 @@
 
         #include "InstantCoroutine.h"
 
-        //Create functor class named SequenceOfSquares for coroutine producing squares
+        // Create functor class named SequenceOfSquares for a coroutine 
+        // producing squares starting from 0 
         CoroutineDefine( SequenceOfSquares ) {
             //coroutine variables (state persisting between CoroutineYield calls)
             int i = 0;
@@ -31,6 +32,8 @@
         };
 
         //Create functor class named Range for range producing coroutine
+        //(yes, it is possible for a coroutine to be a template, it is just
+        // a class that can be instantiated multiple times!)
         template<class T>
         CoroutineDefine( Range ) {
             T current, last;
@@ -71,7 +74,7 @@
             }
             Serial.println(F("Iteration finished"));
 
-            //NOTE: next iteration will start range from scratch
+            //NOTE: next iteration will start a new range again from scratch
             //      but sequenceOfSquares will continue where is was stopped previously
             delay( 2000 );
         }
@@ -83,9 +86,9 @@
           do not place CoroutineYield inside switch.
     NOTE: It is strongly recommended to turn on all compiler warnings in preferences!
           Remember: all the variables and state shall be outside of coroutine body,
-                    just declare them before coroutine body
-                    (between CoroutineDefine( Range ) { and CoroutineBegin), 
-                    they will turn to class fields!
+                    just declare them before coroutine body (between the
+                    CoroutineDefine(...){  and the CoroutineBegin() ), 
+                    they will turn to corresponding class fields!
 
     The main idea is inspired by https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
     and https://forum.arduino.cc/t/arduino-coroutines-are-they-useful/36819
@@ -97,6 +100,7 @@
     https://probablydance.com/2021/10/31/c-coroutines-do-not-spark-joy/
     (remember InstantCoroutine works in C++11 which is default for Arduino))
 
+    Minimalistic, fast stackless coroutines for C++ 11 and above.  
     MIT License
 
     Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
@@ -127,26 +131,32 @@
 //NOTE: coroutine used after completion also falls here
 #ifndef InstantCoroutine_Panic
 #   ifdef InstantCoroutine_Panic
-#       define InstantCoroutine_Panic() InstantRTOS_Panic("C")  
+#       define InstantCoroutine_Panic() InstantRTOS_Panic('C')  
 #   else
 #       define InstantCoroutine_Panic() /* you can customize here! */ do{}while(true)
 #   endif
 #endif
 
 
-///Define class for coroutine
-/** Class body shall follow in {}, see sample above
+/// Define class for coroutine
+/** Class body shall follow in {}, see sample above.
+ * Use CoroutineBegin(), CoroutineYield(...), CoroutineEnd() inside {}
  * NOTE: all fields are private by default!
- * NOTE: one can place fields (and constructors!) inside {}, see sample above */
+ * NOTE: one can place fields (and constructors!) inside {}, see sample above
+ * NOTE: Coroutine behaves as functor and is compatible with InstantDelegate.h,
+ *       also coroutines work perfectly with InstantScheduler.h )) */
 #define CoroutineDefine(coroutineClassName) \
-    class coroutineClassName: public CppCoroutineBase
+    class coroutineClassName: public CoroutineBase
 
 /// Coroutine body follows this macro (coroutine is initially suspended!)
-/** One shall specify return type or void as the first parameter,
- * other parameters can optionally specify resume parameters for the coroutine
- * (they have to be passed to operator() in coroutine on each resume).
- * REMEMBER: CoroutineEnd must end the coroutine body
- * NOTE: do not declare local variables inside body */
+/** One shall specify return type OR void as the first parameter,
+ * it defines the value coroutine returns each time when "yields back"
+ * other parameters can optionally specify resume parameters for the coroutine.
+ * In this way CoroutineBegin actually defines signature for callable/functor
+ * that resumes coroutine each time when called.
+ * (they have to be passed to operator() of coroutine functor on each resume).
+ * REMEMBER: CoroutineEnd() macro must mark the end of the coroutine body
+ * NOTE: do not declare local variables inside coroutine body */
 #define CoroutineBegin(coroutineResultType, ...) \
     public: \
         /* Just call coroutine object with () to resume the coroutine */ \
@@ -168,12 +178,12 @@
         __VA_ARGS__ \
     )
 
-///The "the last return" from the coroutine
+/// The "the last return" from the coroutine
 /** Once stopped it will be not resumable again */
 #define CoroutineStop(lastRVal) \
     do { cppCoroutineState_Current = CppCoroutineState_Final; return lastRVal; } while (false)
 
-/// End coroutine body (corresponds to CoroutineBegin)
+/// End of coroutine body (corresponds to CoroutineBegin() above)
 #define CoroutineEnd() \
                 default: InstantCoroutine_Panic(); \
             } \
@@ -191,47 +201,48 @@
 
 
 
-///Common base for all coroutine classes
-/** NOTE: copying is not banned, copy will duplicate entire state
- *        let user to decide if he wants lifetime to be copied */
-class CppCoroutineBase{
-    public:
-        ///Test coroutine did not finish (CoroutineStop was NOT called)
-        operator bool() const {
-            return !Finished();
-        }
+///Common base for all coroutine classes (hold the minimal coroutine state)
+/** NOTE: copying is not banned, copy will duplicate entire state as is,
+ *        let the user to decide if he wants lifetime to be copied */
+class CoroutineBase{
+public:
+    ///Test coroutine did not finish (CoroutineStop was NOT called)
+    operator bool() const {
+        return !Finished();
+    }
 
-        ///Test coroutine finished (CoroutineStop was called)
-        bool Finished() const {
-            return CppCoroutineState_Final == cppCoroutineState_Current;
-        }
+    ///Test coroutine finished (CoroutineStop was called)
+    bool Finished() const {
+        return CppCoroutineState_Final == cppCoroutineState_Current;
+    }
 
-    protected:
-        ///For use from derived classes only
-        CppCoroutineBase() = default;
+protected:
+    ///For use from derived classes only
+    CoroutineBase() = default;
 
-        ///Type for state
-        /** Assume our __LINE__ will never go beyond */
-        using CppCoroutineState_Holder = unsigned short;
-        ///Maximum state for static_assert ))
-        /** Compute assuming two's complement for unsigned)) */
-        static constexpr CppCoroutineState_Holder CppCoroutineState_HolderRangeMax =
-                                                ~CppCoroutineState_Holder(0);
+    ///Type for state
+    /** Assume our __LINE__ will never go beyond */
+    using CppCoroutineState_Holder = unsigned short;
+    ///Maximum state for static_assert ))
+    /** Compute assuming two's complement for unsigned)) */
+    static constexpr CppCoroutineState_Holder CppCoroutineState_HolderRangeMax =
+                                            ~CppCoroutineState_Holder(0);
 
-        ///The final state we cannot continue from
-        static constexpr CppCoroutineState_Holder CppCoroutineState_Final = CppCoroutineState_HolderRangeMax;
-        ///Always start from this state
-        static constexpr CppCoroutineState_Holder CppCoroutineState_Initial = 0;
-        
+    ///The final state we cannot continue from
+    static constexpr CppCoroutineState_Holder CppCoroutineState_Final = CppCoroutineState_HolderRangeMax;
+    ///Always start from this state
+    static constexpr CppCoroutineState_Holder CppCoroutineState_Initial = 0;
+    
 
-        ///State where that coroutine is paused/stopped
-        CppCoroutineState_Holder cppCoroutineState_Current = CppCoroutineState_Initial;
+    ///State where that coroutine is paused/stopped
+    CppCoroutineState_Holder cppCoroutineState_Current = CppCoroutineState_Initial;
 };
 
 
 ///Ensure macro argument is expanded before being used
 /** See https://gcc.gnu.org/onlinedocs/cpp/Argument-Prescan.html
- * and https://gcc.gnu.org/onlinedocs/cppinternals/Macro-Expansion.html */
+ * and https://gcc.gnu.org/onlinedocs/cppinternals/Macro-Expansion.html
+ * on why "EXPAND" is needed */
 #define COROUTINE_EXPAND_MACRO(macro) macro
 
 ///Helper macro to form state saving/resume point

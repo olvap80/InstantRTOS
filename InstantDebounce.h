@@ -4,12 +4,17 @@
 
     There are two approaches for debouncing:
 
-        - "Discover" debounced value by checking for debounced state in a loop
-          (time value in ticks/milliseconds/microseconds has to be provided
-           "manually" by the user)
-        - subscribe to "Action" detecting new debounced value
+        - use DebounceAction or ButtonAction detecting new debounced value
+          with the help of the scheduler (the preferred way!)
+
+        - "Discover" debounced value with SimpleDebounce 
+           by checking for debounced state "manually" in a loop
+          (the "straight forward" way of iterative checks without Scheduler
+          this time value in ticks/milliseconds/microseconds has to be provided
+          "manually" by the user)
+        
     
-    Both approaches are covered in samples below
+    Both approaches are covered in samples below.
 
     Simple demo for debouncing button with "Discover" approach control LED and beep))
     @code
@@ -26,7 +31,7 @@
         #define LED_OFF digitalWrite(LED_BUILTIN, LOW)
 
         //Pin with beeper
-        #define BEEP_PIN 7
+        #define BEEP_PIN 4
 
         namespace{
             // For demo purposes generate frequency directly from the code
@@ -107,96 +112,6 @@
 
 #ifndef InstantDebounce_INCLUDED_H
 #define InstantDebounce_INCLUDED_H
-
-//activate SimpleDebounce feature only if InstantTimer dependency is present 
-#if __has_include("InstantTimer.h")
-// Simple timing classes to track timings in platform independent way
-#include "InstantTimer.h"
-
-/// Debounce single digital value (to be used in continuous loop)
-class SimpleDebounce{
-public:
-    /// Units being used for time measurements
-    /** It is yous choice to provide milliseconds or microseconds,
-     * just remember to be consistent for the same SimpleDebounce instance,
-     * requirements shall be the same as for SimpleTimer::Ticks type */
-    using Ticks = SimpleTimer::Ticks;
-
-    /// Setup initial instance parameters
-    constexpr SimpleDebounce(
-        bool initialValue, ///< Value considered to be initial from start
-        Ticks debounceTicks ///< How long to wait before accepting a new value
-    )
-        : currentDebouncedVal(initialValue)
-        , debounceInterval(debounceTicks)
-    {}
-
-    /// Current value considered to be filtered (debounced)
-    constexpr bool Value() const {
-        return currentDebouncedVal;
-    }
-
-    /// Take the new time and value into account
-    /** Called with current value on each iteration,
-     * \returns true if new (different) value is detected ("discovered")
-     *          after the debounce cycle was performed
-     *  (returned value can be used to detect state change) */
-    bool Discover(
-        Ticks time, ///< Current time in the same units as in constructor
-        bool val ///< Current value corresponding to time
-    ){
-        bool sameValue = (val == currentDebouncedVal);
-        
-        if( simpleTimer.Discover(time) ){
-            // We were in debounce state, and debouncing timer just expired!
-            if( !sameValue ){
-                // new debounced value was detected
-                
-                //same as currentDebouncedVal = val;
-                currentDebouncedVal = !currentDebouncedVal;
-                
-                return true; //DIFFERENT VALUE for sure!
-            }
-            //else means button was released before debounce time!
-        }
-        else{
-            //here we are either counting debounce time or already debounced
-
-            // Using != for booleans as logical XOR ))
-            if( sameValue != simpleTimer.IsExpired() ){
-                /* here != means one of:
-                1. same value while counting debounce interval
-                                            -> chattering continues
-                2. different value when previous was debounced
-                                            -> need to debounce again
-                BOTH cases mean we start timing from scratch */
-                simpleTimer.Start(time, debounceInterval);
-            }
-        }
-        
-        return false; //value did not change (yet)
-    }
-
-    ///Suppress any "incompatible" timings
-    /** This forces using exact Ticks type */
-    template<class OtherTicks>
-    bool Discover(
-        OtherTicks time, ///< Current time in the same units as in constructor
-        bool val
-    ) = delete;
-
-private:
-    /// Value being already debounced (considered as being current)
-    bool currentDebouncedVal = false;
-
-    /// Timed to be used for debounce (remember it is initially expired!)
-    SimpleTimer simpleTimer;
-    /// Timeout used to charge simpleTimer for debounce
-    const Ticks debounceInterval;
-};
-
-#endif
-
 
 //activate DebounceAction feature only if InstantScheduler dependency is present 
 #if __has_include("InstantScheduler.h") && __has_include("InstantDelegate.h")
@@ -369,6 +284,96 @@ private:
 };
 
 
+
+#endif
+
+
+//activate SimpleDebounce feature only if InstantTimer dependency is present 
+#if __has_include("InstantTimer.h")
+// Simple timing classes to track timings in platform independent way
+#include "InstantTimer.h"
+
+/// Debounce single digital value (to be used in continuous loop)
+class SimpleDebounce{
+public:
+    /// Units being used for time measurements
+    /** It is yous choice to provide milliseconds or microseconds,
+     * just remember to be consistent for the same SimpleDebounce instance,
+     * requirements shall be the same as for SimpleTimer::Ticks type */
+    using Ticks = SimpleTimer::Ticks;
+
+    /// Setup initial instance parameters
+    constexpr SimpleDebounce(
+        bool initialValue, ///< Value considered to be initial from start
+        Ticks debounceTicks ///< How long to wait before accepting a new value
+    )
+        : currentDebouncedVal(initialValue)
+        , debounceInterval(debounceTicks)
+    {}
+
+    /// Current value considered to be filtered (debounced)
+    constexpr bool Value() const {
+        return currentDebouncedVal;
+    }
+
+    /// Take the new time and value into account
+    /** Called with current value on each iteration,
+     * \returns true if new (different) value is detected ("discovered")
+     *          after the debounce cycle was performed
+     *  (returned value can be used to detect state change) */
+    bool Discover(
+        Ticks time, ///< Current time in the same units as in constructor
+        bool val ///< Current value corresponding to time
+    ){
+        bool sameValue = (val == currentDebouncedVal);
+        
+        if( simpleTimer.Discover(time) ){
+            // We were in debounce state, and debouncing timer just expired!
+            if( !sameValue ){
+                // new debounced value was detected
+                
+                //same as currentDebouncedVal = val;
+                currentDebouncedVal = !currentDebouncedVal;
+                
+                return true; //DIFFERENT VALUE for sure!
+            }
+            //else means button was released before debounce time!
+        }
+        else{
+            //here we are either counting debounce time or already debounced
+
+            // Using != for booleans as logical XOR ))
+            if( sameValue != simpleTimer.IsExpired() ){
+                /* here != means one of:
+                1. same value while counting debounce interval
+                                            -> chattering continues
+                2. different value when previous was debounced
+                                            -> need to debounce again
+                BOTH cases mean we start timing from scratch */
+                simpleTimer.Start(time, debounceInterval);
+            }
+        }
+        
+        return false; //value did not change (yet)
+    }
+
+    ///Suppress any "incompatible" timings
+    /** This forces using exact Ticks type */
+    template<class OtherTicks>
+    bool Discover(
+        OtherTicks time, ///< Current time in the same units as in constructor
+        bool val
+    ) = delete;
+
+private:
+    /// Value being already debounced (considered as being current)
+    bool currentDebouncedVal = false;
+
+    /// Timed to be used for debounce (remember it is initially expired!)
+    SimpleTimer simpleTimer;
+    /// Timeout used to charge simpleTimer for debounce
+    const Ticks debounceInterval;
+};
 
 #endif
 

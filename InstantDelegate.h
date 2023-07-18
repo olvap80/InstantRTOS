@@ -1,19 +1,23 @@
 /** @file InstantDelegate.h
     @brief Fast deterministic delegates for invoking callbacks/function pointers,
            suitable for real time operation (no heap allocation at all)
-           "bound" delegates are also supported for calling methods of objects.
+           "bound" delegates are also supported for calling methods of objects
+           (member function pointers are also callable with InstantDelegate).
 
     (c) and license see https://github.com/olvap80/InstantRTOS
 
-    Initially created as a lightweight delegates/lambdas for Arduino platform.
+    Initially was created as a low-memory, easy to copy, fast-to-invoke
+    lightweight delegates/lambdas for Arduino and similar platforms,
+    Can be also used as alternative delegate on Windows and Linux.
     Zero dependencies, by default does not depend even on standard headers!
     Cheap and fast replacement of std::function for Arduino and other platforms.
     Any "callable stuff" can be handled with InstantDelegate library :)
-    Suitable for embedded real time applications requiring deterministic behavior.
-    
-    You can just copy this to your project, it dos not depend on InstantRTOS.
+    Suitable for embedded real time applications with deterministic behavior.
+
+    You can just copy this file to your project,
+    it dos not depend on other components of InstantRTOS.
     Single header, no build steps required!
-    
+
     Short sample:
     @code
         //shorthand to not repeat the same signature every time
@@ -196,9 +200,11 @@
     "callable" items (lambda, functor or instance method) and can be treated
     as a "reference" to some "callable thing" existing "somewhere else".
     Here word "referring" means original content is not copied into that Delegate
-    thus instance of the Delegate class acts as a "callable reference" implemented
-    by wrapping  (object_pointer, function_pointer) pair.
-
+    thus instance of the Delegate class acts as a "callable reference"
+    implemented by wrapping (object_pointer, function_pointer) pair.
+    
+    
+    Fast delegate system for functions, functors and member function pointers
     MIT License
 
     Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
