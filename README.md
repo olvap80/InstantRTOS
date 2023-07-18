@@ -75,14 +75,15 @@ Coroutines are nice structural replacement for finite state machines (FSMs), sin
 ## What about preemption of tasks?
 Multiple "threads of execution" is the feature leading us to mutexes and semaphores, CAS and memory barriers...
 this compicates programming a lot (and hurts CPU parformance!).
-Context switches for "true" preemption “threads of execution” by “other threads of execution” on the same CPU are bad (both by time to switch, misses in CPU cache, and by space used for multiple stacks and for storing CPU contexts). Context switches are not portable at all!
+Context switches for preempting of some “thread” by “some other thread” on the same CPU are bad (more time to switch, misses in CPU cache, space needed for multiple stacks and storing CPU contexts). The way of doing CPU context switching is not portable at all, each kind of CPU has own fancy way to do this!
 
 So regarding preemption: "not yet", but is it really always needed?
 "True man use preemption", that is why "Active Objects" and "run to completion" was invented (to overcome syncronization troubles caused by preemption!)
 Once "each Active Object handles one event at a time" and "runs to completion" this looks like... single threaded execution on single CPU!
-And with single physical CPU (like AVR on Arduino) our "tasks" do not run "in parallel", and so doing "true" preemption with CPU context switching leads to... CPU time and memory space lost!
+With single physical CPU (like AVR on Arduino) our "tasks" definitely do not run "in parallel" (they have to "context switch" from one to another).
+So doing "true" preemption of multiple tasks with CPU context switching leads to... CPU time and memory space lost!
 
-The only real case when preemption is needed is to let "the more important task to interrupt the less important task", this leads us to next section about priorities.  
+The only real case when task preemption is really needed is to let "the more important task to interrupt the less important task", this leads us to next section about priorities.  
 
 
 ## Then what about task priorities?
