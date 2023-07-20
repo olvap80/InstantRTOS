@@ -34,11 +34,14 @@
 // Main include file for the Arduino SDK (this also makes vscode hints happy)
 #include "Arduino.h"
 
+// Uncomment below to allow InstantRTOS_Enter/LeaveCritical
 #define InstantRTOS_TryAllowCritical
 
 //TODO: move that logic to InstantTryCPU.h ))
 #ifdef InstantRTOS_TryAllowCritical
 #   if __has_include(<util/atomic.h>)
+        //see also http://www.gammon.com.au/interrupts on interrupts on AVR
+        //and https://arduino.stackexchange.com/questions/30968/how-do-interrupts-work-on-the-arduino-uno-and-similar-boards#comment60365_30969
 #       include <util/atomic.h>
 #       define InstantRTOS_EnterCritical ATOMIC_BLOCK(ATOMIC_RESTORESTATE){
 #       define InstantRTOS_LeaveCritical }

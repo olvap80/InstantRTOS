@@ -470,6 +470,8 @@ private:
 //##############################################################################
 
 
+//______________________________________________________________________________
+// Implementing ActionNode
 
 inline ActionNode::ActionNode(const Callback& eventCallback)
     : eventSlot(eventCallback) {}
@@ -667,6 +669,8 @@ inline void ActionNode::scheduleAfterFindPlace(){
 }
 
 
+//______________________________________________________________________________
+// Implementing Scheduler
 
 inline void Scheduler::Start(Ticks currentTicks){
     knownAbsoluteTicks = currentTicks;
@@ -849,6 +853,9 @@ inline Scheduler::Ticks Scheduler::KnownAbsoluteTicks() const{
 
 #endif
 
+
+//______________________________________________________________________________
+// Implementing MulticastToActions
 
 void MulticastToActions::operator()(){
     IntrusiveList<ActionNode>* actions;

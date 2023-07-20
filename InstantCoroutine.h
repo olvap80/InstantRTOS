@@ -39,11 +39,10 @@
             T current, last;
         public:
             ///Constructor to establish initial coroutine state
-            Range(T beginFrom, T endWith)
-                : current(beginFrom), last(endWith) {}
+            Range(T beginFrom, T endWith) : current(beginFrom), last(endWith) {}
 
             //body of the coroutine that uses this state
-            CoroutineBegin(int)
+            CoroutineBegin(T)
                 for(; current < last; ++current){
                     CoroutineYield( current );
                 }
@@ -81,6 +80,12 @@
 
     @endcode
 
+    The main idea here is inspired by 
+        https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
+    and https://forum.arduino.cc/t/arduino-coroutines-are-they-useful/36819
+    coroutine state is saved as class fields (see sample above).
+
+    This can serve as C++ coroutines for embedded platforms (like Arduino),
     
     NOTE: CoroutineYield will not function correctly within a switch block,
           do not place CoroutineYield inside switch.
@@ -90,15 +95,22 @@
                     CoroutineDefine(...){  and the CoroutineBegin() ), 
                     they will turn to corresponding class fields!
 
-    The main idea is inspired by https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
-    and https://forum.arduino.cc/t/arduino-coroutines-are-they-useful/36819
-    coroutine state is saved as class fields (see sample below).
+    REMEMBER: return cannot be used inside Coroutine body,
+              (use CoroutineYield or CoroutineStop instead of return)!
+              also be aware that break can be used only in nested loop!
+    NOTE: do not declare local variables inside coroutine body
+          (actually do not declare local variable crossing CoroutineYield!),
+          use LifetimeManagerScope once RAII like lifetime is needed
 
-    This can serve as C++ coroutines for embedded platforms (like Arduino)
 
     On why "native C++20 coroutines" are not suitable for embedded, see:
     https://probablydance.com/2021/10/31/c-coroutines-do-not-spark-joy/
     (remember InstantCoroutine works in C++11 which is default for Arduino))
+
+    Additional links confirming approach used here shall work:
+    https://stackoverflow.com/questions/514118/how-does-duffs-device-work
+    and https://stackoverflow.com/questions/64475978/is-using-if-0-to-skip-a-case-in-a-switch-supposed-to-work 
+
 
     Minimalistic, fast stackless coroutines for C++ 11 and above.  
     MIT License
@@ -141,6 +153,9 @@
 /// Define class for coroutine
 /** Class body shall follow in {}, see sample above.
  * Use CoroutineBegin(), CoroutineYield(...), CoroutineEnd() inside {}
+ * REMEMBER: return cannot be used inside Coroutine body,
+ *           (use CoroutineYield or CoroutineStop instead of return)!
+ *           also be aware that break can be used only in nested loop!
  * NOTE: all fields are private by default!
  * NOTE: one can place fields (and constructors!) inside {}, see sample above
  * NOTE: Coroutine behaves as functor and is compatible with InstantDelegate.h,
@@ -156,7 +171,12 @@
  * that resumes coroutine each time when called.
  * (they have to be passed to operator() of coroutine functor on each resume).
  * REMEMBER: CoroutineEnd() macro must mark the end of the coroutine body
- * NOTE: do not declare local variables inside coroutine body */
+ * REMEMBER: return cannot be used inside Coroutine body,
+ *           (use CoroutineYield or CoroutineStop instead of return)!
+ *           also be aware that break can be used only in nested loop!
+ * NOTE: do not declare local variables inside coroutine body
+ *       (actually do not declare local variable crossing CoroutineYield!)
+ *       use LifetimeManagerScope once RAII like lifetime is needed */
 #define CoroutineBegin(coroutineResultType, ...) \
     public: \
         /* Just call coroutine object with () to resume the coroutine */ \
@@ -170,8 +190,9 @@
 /// Yield to caller (with value if coroutineResultType was not void)
 /** Remember state and suspend execution
  *  (next call to operator() will resume from the same place)
- *  NOTE: one cannot place CoroutineYield inside switch statement
- *  NOTE: one can specify return values for resumable coroutines */
+ *  REMEMBER: one cannot place CoroutineYield inside switch statement
+ *  NOTE: one can specify return values for resumable coroutines,
+ *        so CoroutineYield supports yielding value */
 #define CoroutineYield(...) \
     COROUTINE_YIELD_FROM(\
         (CppCoroutineState_Initial + (COROUTINE_PLACE_COUNTER - CppCoroutineState_COUNTER_START)), \
@@ -183,12 +204,13 @@
 #define CoroutineStop(lastRVal) \
     do { cppCoroutineState_Current = CppCoroutineState_Final; return lastRVal; } while (false)
 
-/// End of coroutine body (corresponds to CoroutineBegin() above)
+/// End of the coroutine body (corresponds to CoroutineBegin() above)
 #define CoroutineEnd() \
                 default: InstantCoroutine_Panic(); \
             } \
         } \
     public:
+
 
 
 

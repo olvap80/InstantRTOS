@@ -43,7 +43,7 @@
          void loop() {
             ...
 
-            manualManagement.Create("Some parameter", 42); //lifetime started
+            manualManagement.Emplace("Some parameter", 42); //lifetime started
             ...
             manualManagement->SomeAction(); //continues
             ...
@@ -51,6 +51,96 @@
             
             ...
             useAsSingleton.Singleton().DoSomethingElse(); //create if not exists
+        }
+    @endcode
+
+    There is a LifetimeManagerScope macro to allow RAII for LifetimeManager,
+    so that you do not need to call Emplace and Destroy manually.
+    The LifetimeManagerScope does not create variable on stack, thus it is
+    ideal option to work in pair with InstantCoroutine.h allowing object
+    life time management and coroutine nesting, see sample below:
+    @code
+        #include "InstantCoroutine.h"
+        #include "InstantMemory.h"
+
+        CoroutineDefine( SequenceOfSquares ) {
+            int i = 0;
+            CoroutineBegin(int)
+                for ( ;; ++i){
+                    CoroutineYield( i*i );
+                }
+            CoroutineEnd()
+        };
+        CoroutineDefine( SequenceOfCubes ) {
+            int i = 0;
+            CoroutineBegin(int)
+                for ( ;; ++i){
+                    CoroutineYield( i*i*i );
+                }
+            CoroutineEnd()
+        };
+
+        template<class T>
+        CoroutineDefine( Range ) {
+            T current, last;
+        public:
+            Range(T beginFrom, T endWith) : current(beginFrom), last(endWith) {}
+
+            CoroutineBegin(T)
+                for(; current < last; ++current){
+                    CoroutineYield( current );
+                }
+                CoroutineStop(last);
+            CoroutineEnd()
+        };
+
+        CoroutineDefine( UseOtherCoroutines ) {
+            LifetimeManager< Range<int8_t> > range;
+            LifetimeManager<SequenceOfSquares> sequenceOfSquares;
+            LifetimeManager<SequenceOfCubes> sequenceOfCubes;
+            
+            CoroutineBegin(void)
+                for ( ;; ){
+                    Serial.println(F("------ ITERATION STARTED -----"));
+                    Serial.println(F("Printing squares:"));
+                    LifetimeManagerScope(sequenceOfSquares){
+                        LifetimeManagerScope(range, 0, 10){
+                            while( *range ){
+                                Serial.print( (*range)() );
+                                Serial.print( ':' );
+                                Serial.println( (*sequenceOfSquares)() );
+                                CoroutineYield();
+                            }
+                        }
+                    }
+
+                    Serial.println(F("Printing cubes:"));
+                    CoroutineYield();
+
+                    LifetimeManagerScope(sequenceOfCubes){
+                        LifetimeManagerScope(range, 0, 15){
+                            while( *range ){
+                                Serial.print( (*range)() );
+                                Serial.print( ':' );
+                                Serial.println( (*sequenceOfCubes)() );
+                                CoroutineYield();
+                            }
+                        }
+                    }
+                }
+            CoroutineEnd()
+        };
+
+        //The coroutine using other coroutines
+        UseOtherCoroutines useOtherCoroutines;
+
+        void setup() {
+            Serial.begin(9600);
+        }
+
+        void loop() {
+            useOtherCoroutines();
+            delay( 200 );
         }
     @endcode
 
@@ -83,6 +173,8 @@
 
 //______________________________________________________________________________
 // Portable configuration (just skip to "Classes for memory operations" below))
+
+//#define InstantMemory_BlockPoolCountInMetadata
 
 /* Keep promise to not use any standard libraries by default, 
 Enable defines below to allow standard library instead of own implementation */
@@ -150,7 +242,7 @@ inline void* operator new(INSTANTMEMORY_SIZE_T, InstantMemoryPlaceholderHelper p
 
 
 //______________________________________________________________________________
-// Configurable error handling
+// Configurable error handling and interrupt safety
 
 #ifndef InstantMemory_Panic
 #   ifdef InstantRTOS_Panic
@@ -171,19 +263,19 @@ inline void* operator new(INSTANTMEMORY_SIZE_T, InstantMemoryPlaceholderHelper p
 #endif
 
 //______________________________________________________________________________
-// Classes for memory operations
+// Classes for memory operations - BlockPool and variations
 
 
 ///Optimized base for BlockPool (used for all kinds of BlockPools below)
 /** All various BlockPools reuse the same implementation
  *  to save program space being spent on allocation/deallocation logic.
- *  Use BlockPool or SmartAllocator (TBD) below
+ *  Use SimpleBlockPool or SmartAllocator (TBD) below
  *  (NOTE: single implementation to not duplicate code for each type) */
-class BlockPoolBase{
+class BlockPool{
 public:
     //all the copying is banned
-    constexpr BlockPoolBase(const BlockPoolBase&) = delete;
-    BlockPoolBase& operator =(const BlockPoolBase&) = delete;
+    constexpr BlockPool(const BlockPool&) = delete;
+    BlockPool& operator =(const BlockPool&) = delete;
 
     //NOTE: for actual allocation API see corresponding derived classes
 
@@ -208,9 +300,7 @@ public:
     void* AllocateRaw();
 
 
-    /// "Raw" memory deallocation, panic if not allocated here
-    /** Can "panic" if memory is not owned by that BlockPoolBase,
-     * Free raw bytes, do not issue any destructors! */
+    /// Free raw bytes, do not issue any destructors!
     static void FreeRaw(void* memoryPreviouslyAllocatedByBlockPool);
 
     /// "Raw" deallocation with destructor, panic if not allocated here
@@ -218,27 +308,25 @@ public:
     static void Free(TBeingPlacedWhileAllocating* correspondingAllocatedObject);
     
     /// Use this for determining minimum alignment requirements
-    union Metadata{
-        BlockPoolBase* owner; ///<Internal usage
-        ByteType* next; ///<Internal usage
-        SizeType s; ///<Internal usage (for alignment purposes)
+    struct Metadata{
+        union{
+            BlockPool* owner; ///<Internal usage
+            ByteType* next; ///<Internal usage
+            SizeType s; ///<Internal usage (for alignment purposes)
+        };
+#ifdef InstantMemory_BlockPoolCountInMetadata
+        SizeType useCount;
+#endif
     };
 
-protected:
-    /// @Make gcc happy with C++ 11
-    constexpr BlockPoolBase() = delete;
-
-    ///Initialize BlockPool logic
-    /** One must be sure memoryArea contains at least
-     *  entireBlockSizeUsed*totalBlocksAvailable bytes!
-     *  Metadata is added to the end of */
-    BlockPoolBase(
-        ByteType* memoryArea, ///< BlockPoolBase will place allocated blocks here,
-                              ///< there shall be space enough to hold
-                              ///< entireBlockSizeUsed*totalBlocksAvailable bytes
-        SizeType customBlockSizeUsed, ///Custom part in the block
-        SizeType entireBlockSizeUsed, ///<Entire block size (as calculated by EntireBlockSize)
-        SizeType totalBlocksAvailable ///<Total number of full blocks reserved
+    /// Helper to use in assertions for type sizes
+    template<SizeType N>
+    struct IsPowerOfTwo {
+        static constexpr bool value = 0 != ((N >= 1) & !(N & (N - 1)));
+    };
+    static_assert(
+        IsPowerOfTwo<sizeof(Metadata)>::value,
+        "sizeof(Metadata) shall be power of two"
     );
 
     /// Calculate size of the block together with helper information (Metadata)
@@ -252,20 +340,27 @@ protected:
         SizeType requestedAlignment
     );
 
+protected:
+    /// @Make gcc happy with C++ 11
+    constexpr BlockPool() = delete;
 
-    template<SizeType N>
-    struct IsPowerOfTwo {
-        static constexpr bool value = 0 != ((N >= 1) & !(N & (N - 1)));
-    };
-    static_assert(
-        IsPowerOfTwo<sizeof(Metadata)>::value,
-        "sizeof(Metadata) shall be power of two"
+    ///Initialize BlockPool logic
+    /** One must be sure memoryArea contains at least
+     *  entireBlockSizeUsed*totalBlocksAvailable bytes!
+     *  Metadata is added to the end of */
+    BlockPool(
+        ByteType* memoryArea, ///< BlockPool will place allocated blocks here,
+                              ///< there shall be space enough to hold
+                              ///< entireBlockSizeUsed*totalBlocksAvailable bytes
+        SizeType customBlockSizeUsed, ///Custom part in the block
+        SizeType entireBlockSizeUsed, ///<Entire block size (as calculated by EntireBlockSize)
+        SizeType totalBlocksAvailable ///<Total number of full blocks reserved
     );
     
 private:
-    /// Constant to mark BlockPoolBase instances for debugging purposes
+    /// Constant to mark BlockPool instances for debugging purposes
     static constexpr SizeType MarkToTest = 24991;
-    /// Mark BlockPoolBase instances for debugging purposes
+    /// Mark BlockPool instances for debugging purposes
     const SizeType mark = MarkToTest;
 
     /// Custom pa
@@ -288,48 +383,79 @@ private:
 };
 
 
+/// Common allocation operations on BlockPool
+template<BlockPool::SizeType SingleBlockSizeRequested>
+class BlockPoolAllocator: public BlockPool{
+public:
+    using BlockPool::BlockPool;
+
+    ///Allocation with simultaneous construction (and static check for size))
+    template<class TBeingPlacedWhileAllocating, class... Args>
+    TBeingPlacedWhileAllocating* Allocate(Args&&... args);
+
+    /// RAII to enclose unique allocation from corresponding BlockPool
+    ///TODO: move this to BlockPool above
+    template<class TBeingPlacedWhileAllocating>
+    class UniqueAllocation{
+    public:
+    private:
+    };
+
+    /// RAII for unique allocation in BlockPool 
+    template<class TBeingPlacedWhileAllocating, class... Args>
+    UniqueAllocation<TBeingPlacedWhileAllocating> AllocateUnique(Args&&... args);
+
+    /// RAII to enclose unique allocation from corresponding BlockPool
+    ///TODO: move this to BlockPool above
+    ///TODO: two strategies of place for counter
+    template<class TBeingPlacedWhileAllocating>
+    class SharedAllocation{
+    public:
+    private:
+    };
+
+    /// RAII for shared allocation in BlockPool 
+    template<class TBeingPlacedWhileAllocating, class... Args>
+    SharedAllocation<TBeingPlacedWhileAllocating> AllocateShared(Args&&... args);
+};
+
 ///Simple pool to allocate fixed size blocks
 /** Allow allocation of raw pointer to fixed size memory blocks */
 template<
-    BlockPoolBase::SizeType SingleBlockSizeRequested,
-    BlockPoolBase::SizeType TotalNumBlocks,
-    class AlignAsType = BlockPoolBase::Metadata
+    BlockPool::SizeType SingleBlockSizeRequested,
+    BlockPool::SizeType TotalNumBlocks,
+    class AlignAsType = BlockPool::Metadata
 >
-class BlockPool: public BlockPoolBase{
-    static_assert(
-        SingleBlockSizeRequested >= 2,
-        "Too small blocks are not supported by BlockPool");
+class SimpleBlockPool: public BlockPoolAllocator<SingleBlockSizeRequested>{
     static_assert(
         SingleBlockSizeRequested % alignof(AlignAsType) == 0,
         "BlockPool: ensure your blocks are of proper size allowing proper alignment"
     );
-
 public:
-    /// Create ready to use BlockPool
-    constexpr BlockPool();
-    
-    ///Allocation with simultaneous construction
-    template<class TBeingPlacedWhileAllocating, class... Args>
-    TBeingPlacedWhileAllocating* Allocate(Args&&... args);
+    /// Create ready to use SimpleBlockPool
+    constexpr SimpleBlockPool();
 
 private:
-    static constexpr SizeType entireBlockSize =
-        EntireBlockSize(SingleBlockSizeRequested, alignof(AlignAsType));
+    static constexpr BlockPool::SizeType entireBlockSize =
+        BlockPool::EntireBlockSize(SingleBlockSizeRequested, alignof(AlignAsType));
+    
     static_assert(
-        IsPowerOfTwo<alignof(AlignAsType)>::value,
+        BlockPool::IsPowerOfTwo<alignof(AlignAsType)>::value,
         "alignof(AlignAsType) shall be power of two"
     );
-
+    
     /// Actual memory for blocks allocated as a single chunk
     /** Allocation info is not intermixed with allocated bytes,
      * thus there are no problems with alignments and strict aliasing */
-    alignas(AlignAsType) ByteType memoryForBlocks[
+    alignas(AlignAsType) BlockPool::ByteType memoryForBlocks[
         entireBlockSize*TotalNumBlocks
     ];
 };
 
 
 
+//______________________________________________________________________________
+// Classes for memory operations - LifetimeManager
 
 ///Allow instance of T to be constructed "in place"
 /** Wraps constructable items and manage their lifetime explicitly,
@@ -347,84 +473,66 @@ public:
     /// Initialize empty instance
     LifetimeManager() = default;
 
-    ///Create corresponding item, or panic if already exists
+    /// Cleanup all the stuff if it is still there 
+    ~LifetimeManager();
+
+    ///Create corresponding item inside, or panic if already exists
     /** Always returns valid reference (if returns at all)) */
     template<class... Args>
-    T& Create(Args&&... args){
-        if( !exists ){
-            exists = true;
-            /* Create new item explicitly.
-               Does what std::forward by exploiting reference collapsing */
-            return *new( InstantMemoryPlaceholderHelper(placeInMemory) )
-                                        T( reinterpret_cast<Args&&>(args)... );
-        }
-        InstantMemory_Panic();
-    }
+    T& Emplace(Args&&... args);
 
     ///Access existing item or create the new one if not exists
-    /** Use Create or operator-> if you do not need singleton
+    /** Use Emplace or operator-> if you do not need singleton
      * NOTE: No thread safety in favor of simplicity here! */
     template<class... Args>
-    T& Singleton(Args&&... args){
-        if( exists ){
-            return reinterpret_cast<T*>(placeInMemory);
-        }
-        exists = true;
-        return *new( InstantMemoryPlaceholderHelper(placeInMemory) )
-                                        T( reinterpret_cast<Args&&>(args)... );
-    }
+    T& Singleton(Args&&... args);
     
     ///Destroy corresponding item if it existed
-    void Destroy(){
-        if( exists ){
-            exists = false;
-            //call destructor explicitly
-            reinterpret_cast<T*>(placeInMemory)->~T();
-        }
-    }
+    void Destroy();
 
     ///Destroy corresponding item if it existed, panic if not
-    void DestroyOrPanic(){
-        if( exists ){
-            exists = false;
-            ///call destructor explicitly
-            reinterpret_cast<T*>(placeInMemory)->~T();
-        }
-        else{
-            InstantMemory_Panic();
-        }
-    }
+    void DestroyOrPanic();
 
     ///Check item exists
-    explicit operator bool() const {
-        return exists;
-    }
+    explicit operator bool() const;
 
     ///Access to wrapped value
-    /** Use reference from Create to avoid extra check */
-    T* operator->(){
-        if( exists ){
-            return reinterpret_cast<T*>(placeInMemory);
-        }
-        InstantMemory_Panic();
-    }
+    /** Use reference from Emplace to avoid extra check */
+    T* operator->();
 
     ///Access to wrapped value
-    /** Use reference from Create to avoid extra check */
-    T& operator*(){
-        if( exists ){
-            return *reinterpret_cast<T*>(placeInMemory);
-        }
-        InstantMemory_Panic();
-    }
+    /** Use reference from Emplace to avoid extra check */
+    T& operator*();
 
 private:
     ///Actual location of that object
     /** See also https://en.cppreference.com/w/cpp/language/new#Placement_new */
-    alignas(T) BlockPoolBase::ByteType placeInMemory[ sizeof(T) ];
+    alignas(T) BlockPool::ByteType placeInMemory[ sizeof(T) ];
 
     bool exists = false;
 };
+
+/// Keep track of LifetimeManager activation without creating stack instance
+/** This is kind of "RAII like" scope for T from LifetimeManager<T> 
+ * Especially useful with InstantCoroutine.h to make RAII like scopes,
+ * but without introducing local variables crossing CoroutineYield()!
+ * Use LifetimeManagerScope to nandle Emplace and Destroy automatically.
+ * @code
+ *      LifetimeManager<SomeClass> someLifetimeManager;
+ *      ... //SomeClass does not exist here
+ *      LifetimeManagerScope(someLifetimeManager){
+ *          //SomeClass created (emplaced) and exists here
+ *          ...
+ *          someLifetimeManager->SomeAPI();
+ *          ...
+ *      }
+ *      //SomeClass does not exist here (destroyed)
+ * @endcode
+ * One can use lifetimeManager inside {} block following LifetimeManagerScope
+ * and LifetimeManagerScope takes care to Destroy() once leaving that block
+ * REMEMBER: break, continue and return shall not be used inside block! */
+#define LifetimeManagerScope(lifetimeManager, ...) \
+    for ( lifetimeManager.Emplace(__VA_ARGS__); lifetimeManager ; lifetimeManager.Destroy() )
 
 
 /// TODO: SmartAllocator not yet ready! implement later
@@ -466,8 +574,11 @@ private:
 *=============================================================================*/
 //##############################################################################
 
-/// One must include metadata without spoiling alignment
-inline constexpr BlockPoolBase::SizeType BlockPoolBase::entireAlignedBlockSize(
+
+//______________________________________________________________________________
+// Implementing BlockPool
+
+inline constexpr BlockPool::SizeType BlockPool::entireAlignedBlockSize(
     SizeType customBlockSizeRequested,
     SizeType alignmentWithMetadata
 ){
@@ -480,20 +591,20 @@ inline constexpr BlockPoolBase::SizeType BlockPoolBase::entireAlignedBlockSize(
         ) * alignmentWithMetadata;
 }
 
-inline constexpr BlockPoolBase::SizeType BlockPoolBase::BlockSize() const{
+inline constexpr BlockPool::SizeType BlockPool::BlockSize() const{
     return customBlockSize;
 }
 
-inline constexpr BlockPoolBase::SizeType BlockPoolBase::TotalBlocks() const{
+inline constexpr BlockPool::SizeType BlockPool::TotalBlocks() const{
     return totalBlocks;
 }
 
-inline constexpr BlockPoolBase::SizeType BlockPoolBase::BlocksAllocated() const{
+inline constexpr BlockPool::SizeType BlockPool::BlocksAllocated() const{
     return blocksAllocated;
 }
 
 
-inline void* BlockPoolBase::AllocateRaw(){
+inline void* BlockPool::AllocateRaw(){
     ByteType* res = firstFree;
     if( res ){
         auto metadata = reinterpret_cast<Metadata*>(res - sizeof(Metadata));
@@ -508,16 +619,17 @@ inline void* BlockPoolBase::AllocateRaw(){
     return nullptr;
 }
 
-inline void BlockPoolBase::FreeRaw(void* memoryPreviouslyAllocatedByBlockPool){
+inline void BlockPool::FreeRaw(void* memoryPreviouslyAllocatedByBlockPool){
     if( nullptr != memoryPreviouslyAllocatedByBlockPool ){
         ByteType* ptr = reinterpret_cast<ByteType*>(memoryPreviouslyAllocatedByBlockPool);
         
         auto metadata = reinterpret_cast<Metadata*>(ptr - sizeof(Metadata));
-        BlockPoolBase* owner = metadata->owner;
+        BlockPool* owner = metadata->owner;
         if( owner->mark == MarkToTest ){
             // valid block, almost for sure))
             metadata->next = owner->firstFree;
             owner->firstFree = ptr;
+            --owner->blocksAllocated;
         }
         else{
             // someone wants to free invalid block
@@ -527,7 +639,7 @@ inline void BlockPoolBase::FreeRaw(void* memoryPreviouslyAllocatedByBlockPool){
 }
 
 template<class TBeingPlacedWhileAllocating>
-inline void BlockPoolBase::Free(TBeingPlacedWhileAllocating* correspondingAllocatedObject)
+void BlockPool::Free(TBeingPlacedWhileAllocating* correspondingAllocatedObject)
 {
     if( nullptr == correspondingAllocatedObject ){
         return;
@@ -538,7 +650,7 @@ inline void BlockPoolBase::Free(TBeingPlacedWhileAllocating* correspondingAlloca
 
 
 
-inline BlockPoolBase::BlockPoolBase(
+inline BlockPool::BlockPool(
     ByteType* memoryArea,
     SizeType customBlockSizeUsed,
     SizeType entireBlockSizeUsed,
@@ -567,7 +679,7 @@ inline BlockPoolBase::BlockPoolBase(
     )->next = nullptr;
 }
 
-inline constexpr BlockPoolBase::SizeType BlockPoolBase::EntireBlockSize(
+inline constexpr BlockPool::SizeType BlockPool::EntireBlockSize(
     SizeType customBlockSizeRequested,
     SizeType requestedAlignment
 ){
@@ -579,26 +691,19 @@ inline constexpr BlockPoolBase::SizeType BlockPoolBase::EntireBlockSize(
     );
 }
 
-template<
-    BlockPoolBase::SizeType SingleBlockSize,
-    BlockPoolBase::SizeType TotalNumBlocks,
-    class AlignAsType
->
-constexpr BlockPool<SingleBlockSize, TotalNumBlocks, AlignAsType>::BlockPool()
-:   BlockPoolBase(
-        memoryForBlocks, SingleBlockSize, entireBlockSize, TotalNumBlocks
-    ){}
 
-template<
-    BlockPoolBase::SizeType SingleBlockSize,
-    BlockPoolBase::SizeType TotalNumBlocks,
-    class AlignAsType
->
+//______________________________________________________________________________
+// Implementing BlockPoolAllocator
+
+template<BlockPool::SizeType SingleBlockSizeRequested>
 template<class TBeingPlacedWhileAllocating, class... Args>
 TBeingPlacedWhileAllocating* 
-BlockPool<SingleBlockSize, TotalNumBlocks, AlignAsType>::Allocate(Args&&... args){
+BlockPoolAllocator<SingleBlockSizeRequested>::Allocate(Args&&... args){
     //see https://eli.thegreenplace.net/2014/perfect-forwarding-and-universal-references-in-c
-    static_assert(sizeof(TBeingPlacedWhileAllocating) <= SingleBlockSize, "Cannot create item that does not fit into block");
+    static_assert(
+        sizeof(TBeingPlacedWhileAllocating) <= SingleBlockSizeRequested,
+         "Cannot create item that does not fit into block"
+    );
     auto rawMemory = AllocateRaw();
     if( rawMemory ){
         //see https://en.cppreference.com/w/cpp/memory/new/operator_new
@@ -606,6 +711,101 @@ BlockPool<SingleBlockSize, TotalNumBlocks, AlignAsType>::Allocate(Args&&... args
                     TBeingPlacedWhileAllocating(static_cast<Args&&>(args)...);
     }
     return nullptr;
+}
+
+
+//______________________________________________________________________________
+// Implementing SimpleBlockPool
+
+template<
+    BlockPool::SizeType SingleBlockSizeRequested,
+    BlockPool::SizeType TotalNumBlocks,
+    class AlignAsType
+>
+constexpr SimpleBlockPool<SingleBlockSizeRequested, TotalNumBlocks, AlignAsType>
+::SimpleBlockPool()
+:   BlockPoolAllocator<SingleBlockSizeRequested>(
+        memoryForBlocks, SingleBlockSizeRequested, entireBlockSize, TotalNumBlocks
+    )
+{}
+
+
+//______________________________________________________________________________
+// Implementing LifetimeManager
+
+template<class T>
+LifetimeManager<T>::~LifetimeManager(){
+    Destroy();
+}
+
+
+template<class T>
+template<class... Args>
+T& LifetimeManager<T>::Emplace(Args&&... args){
+    if( !exists ){
+        exists = true;
+        /* Create new item explicitly.
+            Does what std::forward by exploiting reference collapsing */
+        return *new( InstantMemoryPlaceholderHelper(placeInMemory) )
+                                    T( reinterpret_cast<Args&&>(args)... );
+    }
+    InstantMemory_Panic();
+}
+
+template<class T>
+template<class... Args>
+T& LifetimeManager<T>::Singleton(Args&&... args){
+    if( exists ){
+        return reinterpret_cast<T*>(placeInMemory);
+    }
+    exists = true;
+    return *new( InstantMemoryPlaceholderHelper(placeInMemory) )
+                                    T( reinterpret_cast<Args&&>(args)... );
+}
+
+
+template<class T>
+void LifetimeManager<T>::Destroy(){
+    if( exists ){
+        exists = false;
+        //call destructor explicitly
+        reinterpret_cast<T*>(placeInMemory)->~T();
+    }
+}
+
+template<class T>
+void LifetimeManager<T>::DestroyOrPanic(){
+    if( exists ){
+        exists = false;
+        ///call destructor explicitly
+        reinterpret_cast<T*>(placeInMemory)->~T();
+    }
+    else{
+        InstantMemory_Panic();
+    }
+}
+
+
+template<class T>
+LifetimeManager<T>::operator bool() const {
+    return exists;
+}
+
+
+template<class T>
+T* LifetimeManager<T>::operator->(){
+    if( exists ){
+        return reinterpret_cast<T*>(placeInMemory);
+    }
+    InstantMemory_Panic();
+}
+
+template<class T>
+T& LifetimeManager<T>::operator*(){
+    if( exists ){
+        return *reinterpret_cast<T*>(placeInMemory);
+    }
+    InstantMemory_Panic();
 }
 
 
