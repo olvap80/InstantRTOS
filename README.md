@@ -3,8 +3,9 @@ Header-only, minimalistic real time operating system, with fast and handy utilit
 Easy to use, simple and intuitive.
 Here word "Instant" stands to the ability for using InstantRTOS parts and patterns immediately (even if you have another RTOS running, you can run InstantRTOS from that RTOS))
 
-# Features and goals
-- Written in C++ 11, suitable to work even on small embedded platforms, like Arduino (yes Arduino actually uses C++! and yes, it is possible to write RTOS in C++).
+# Benefits (and goals)
+- Written in C++ 11: type safety and compile time stuff (constexpr), lambda and efficient delegates, RAII (constructors and destructors)/
+- Suitable to work even on small embedded platforms, like Arduino (yes Arduino actually uses C++! and yes, it is possible to write RTOS in C++).
 - No dependencies (even no standard headers needed) by default.
 - Only standard C++ (does not depend on any platform specifics).
 - Dynamic memory is not required ("heavy" new/delete, malloc/free are not required).
