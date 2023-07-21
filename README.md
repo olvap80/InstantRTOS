@@ -76,18 +76,31 @@ Coroutines are nice structural replacement for finite state machines (FSMs), sin
 ## What about preemption of tasks?
 Multiple "threads of execution" is the feature leading us to mutexes and semaphores, CAS and memory barriers...
 this compicates programming a lot (and hurts CPU parformance!).
-Context switches for preempting of some “thread” by “some other thread” on the same CPU are bad (more time to switch, misses in CPU cache, space needed for multiple stacks and storing CPU contexts). The way of doing CPU context switching is not portable at all, each kind of CPU has own fancy way to do this!
+Context switches for preempting of some “thread” by “some other thread” on the same CPU are bad (more time to switch, misses in CPU cache, space needed for multiple stacks and storing CPU contexts). The exact way of doing CPU context switching is not portable between different platforms at all, each kind of CPU has own fancy way to do this!
 
-So regarding preemption: "not yet", but is it really always needed?
-"True man use preemption", that is why "Active Objects" and "run to completion" was invented (to overcome syncronization troubles caused by preemption!)
-Once "each Active Object handles one event at a time" and "runs to completion" this looks like... single threaded execution on single CPU!
-With single physical CPU (like AVR on Arduino) our "tasks" definitely do not run "in parallel" (they have to "context switch" from one to another).
-So doing "true" preemption of multiple tasks with CPU context switching leads to... CPU time and memory space lost!
+So regarding preemption: "not yet, but some day in the future as an additional module suppotring some platforms"
+But is that preemption really always needed?
 
-The only real case when task preemption is really needed is to let "the more important task to interrupt the less important task", this leads us to next section about priorities.  
+Sometimes argument looks like "cool projects use preemption"... and that is why all those "Active Objects" and "run to completion" were invented: to overcome syncronization troubles caused by preemption on "cool projects"!
+
+But look: once "each Active Object handles one event at a time" and "runs to completion" this looks like... single threaded execution on single CPU!
+With single physical CPU (like AVR on Arduino) our "Active Object tasks" definitely do not run "in parallel" (they have to "switch" from one to another, either preemptively or cooperatively).
+Thus doing "true" preemption of multiple tasks with CPU context switching leads to... CPU time and memory space lost due to the complexity of CPU context swith!
+
+The only **real case** when task preemption is really needed is to let "the more important task to interrupt the less important task",
+and this leads us to next section about priorities.  
 
 
 ## Then what about task priorities?
+Priorities are needed to make "more critical tasks" able "to execute in time" regardless or what "less critical" is doing "right now"!
+Here "regardless of what they do" means even doing ```for(;;){}``` by "less critical task" shall be preempted if needed.
+And "more critical" usually means "a shorter cycle duration results in a higher job priority"
+as suggested by Rate-moonotonic scheduling algorithm.
+
+Naturally in the real case there are shared resources, pending queues (with multiple items waiting in them), etc.
+and so Rate-moonotonic scheduling
+ Priority inversion
+
 TBD on planning and multiple schedulers and on workarounds!
 
 ## Where is HAL? What about registers and peripherals?
