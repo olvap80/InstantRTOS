@@ -42,22 +42,22 @@ Those "exotic" languages usually have big runtime, non deterministic garbage col
 or are not popular enough to have a compiler (and wrappers) for every platform (and instructions on "how to setup them" are not as easy as for "classics").  
 
 **You can use C header files (and libraries) of your platform directly from C++ AS IS**, without all those pains of "foreign function interfaces", "marshaling", etc.!
-Embedded systems, usually ship with C headers, rewriting data structures enumarations and function prototypes from them in a frapper for &lt;exotic_programming_langulage&gt; is pain!
+Embedded systems, usually ship with C headers, rewriting data structures enumerations and function prototypes from them in a frapper for &lt;exotic_programming_langulage&gt; is pain!
 Supporting such integration libraries to be in sync with original C code is pain
-(unlsess someone else is doing that for you on regular basis, but they do not! and even then their wrappers stay mostly undocumented,
-so you still have to dig original C cenrtic documentation and C code)
+(unless someone else is doing that for you on regular basis, but they do not! and even then their wrappers stay mostly undocumented,
+so you still have to dig original C centric documentation and C code)
 
 
 ## Then why C++, why not C?
 Think of C++ as "advanced C" for a moment)) RAII is the must-have feature!
-"Plain" C requires too much boilerplate code aroud simple things. 
+"Plain" C requires too much boilerplate code around simple things. 
 All those "OOP in C stuff", when every "embedded guru" invents own "the right way" and fancy conventions to do all the boilerplate are **not fun** 
 (and "true man on embedded use bare C and assembler" is a myth!)
  
-C++ integrates with C shoothly, but was "not welcome" by for embedded due prejudice caused by some space and time consuming language/runtime features.
+C++ integrates with C smoothly, but was "not welcome" by for embedded due prejudice caused by some space and time consuming language/runtime features.
 But once those features are cut off, C++ is as efficient as C by code execution time and by binary size (and much easier to develop!).
 
-The most famous embedded platform known for using C++ is Arduino, and C++ fits perfectly even into requirements for their simplest board/CPU (yep, C++ copliles even on AVR).
+The most famous embedded platform known for using C++ is Arduino, and C++ fits perfectly even into requirements for their simplest board/CPU (yep, C++ compiles even on AVR).
 Remember: all the fears around C++ are well known, but they are easy to google and are easy to find solutions :)
 
 
@@ -67,41 +67,43 @@ requiring dynamic memory allocation for the thing with known (at the moment of c
 for small embedded platforms.
 
 In contrast the simplest [Coroutine in InstantRTOS](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) 
-requires only sizeof(short) for holding own state and no dynamic memory allocation.
+requires only sizeof(short) for holding its own state and no dynamic memory allocation.
 
-InstantRTOS implements low-memory, fast-switching statckless coroutines to do cooperative multitasking efficienly on any platform.
+InstantRTOS implements low-memory, fast-switching stackless coroutines to do cooperative multitasking efficiently on any platform.
 Coroutines are nice structural replacement for finite state machines (FSMs), since natural flow control statements are used instead of the mess of state/event transitions.
 
 
 ## What about preemption of tasks?
-Multiple "threads of execution" is the feature leading us to mutexes and semaphores, CAS and memory barriers...
-this compicates programming a lot (and hurts CPU parformance!).
-Context switches for preempting of some “thread” by “some other thread” on the same CPU are bad (more time to switch, misses in CPU cache, space needed for multiple stacks and storing CPU contexts). The exact way of doing CPU context switching is not portable between different platforms at all, each kind of CPU has own fancy way to do this!
+Multiple "threads of execution" that "run simultaneously and share resources" is the feature leading us to mutexes and semaphores, CAS and memory barriers, (and race conditions, deadlocks and priority inversion)...
+this complicates programming a lot (and hurts CPU performance!) despite the fact that RTOS do their best to help you dealing with all that stuff.
+Usually there are more "threads of execution" then there physical CPUs available!
+Context switches for preempting of some “thread” by “some other thread” on the same CPU are bad (more time to switch, misses in CPU cache, space needed for multiple stacks and storing CPU contexts).
+The exact way of doing CPU context switching between threads is not portable between different platforms at all, each kind of CPU has own fancy way to do this!
 
-So regarding preemption: "not yet, but some day in the future as an additional module suppotring some platforms"
-But is that preemption really always needed?
+So regarding preemption: "not yet, but some day in the future as an additional module supporting some platforms"...
+But is that preemption really needed for every case?
 
-Sometimes argument looks like "cool projects use preemption"... and that is why all those "Active Objects" and "run to completion" were invented: to overcome syncronization troubles caused by preemption on "cool projects"!
+Sometimes argument looks like "cool projects use preemption"... and that is why all those "Active Objects, communicating with each other by asynchronous message passing" and "run to completion" were invented: to overcome synchronization troubles caused by preemption on "cool projects"!
 
 But look: once "each Active Object handles one event at a time" and "runs to completion" this looks like... single threaded execution on single CPU!
 With single physical CPU (like AVR on Arduino) our "Active Object tasks" definitely do not run "in parallel" (they have to "switch" from one to another, either preemptively or cooperatively).
-Thus doing "true" preemption of multiple tasks with CPU context switching leads to... CPU time and memory space lost due to the complexity of CPU context swith!
+Thus doing "true" preemption of multiple tasks with CPU context switching leads to... CPU time and memory space wasted!
 
 The only **real case** when task preemption is really needed is to let "the more important task to interrupt the less important task",
-and this leads us to next section about priorities.  
+and this leads us to the next section about priorities.  
 
 
 ## Then what about task priorities?
-Priorities are needed to make "more critical tasks" able "to execute in time" regardless or what "less critical" is doing "right now"!
-Here "regardless of what they do" means even doing ```for(;;){}``` by "less critical task" shall be preempted if needed.
+Priorities are needed to make "more critical tasks" able "to execute in time" regardless of what "less critical task" is doing "right now"!
+Here "regardless of what they do" means even doing ```for(;;){}``` by "less critical task" shall be preempted when needed using CPU context switch.
 And "more critical" usually means "a shorter cycle duration results in a higher job priority"
-as suggested by <a href="https://en.wikipedia.org/wiki/Rate-monotonic_scheduling" target="_blank" nofollow>Rate-monotonic scheduling algorithm</a>.
+as suggested by the Rate-monotonic scheduling algorithm.
 
 Naturally in the real case there are shared resources, pending queues (with multiple items waiting in them), etc.
-and so Rate-monotonic scheduling
- Priority inversion
+and even those (beloved by "cool projects") "Active Objects" with their queues of pending messages are not "periodic tasks with unique periods" as it is required by Rate-monotonic scheduling!
+According to above the perfect mathematically proven Rate-monotonic scheduling theorem does not work for the real case!
 
-TBD on planning and multiple schedulers and on workarounds!
+TBD on cooperative multitasking, watchdogs, timeouts planning and multiple schedulers and on workarounds!
 
 ## Where is HAL? What about registers and peripherals?
 The main components of InstantRTOS do not depend on any hardware/platform/CPU specifics at all, here is why:
@@ -123,16 +125,16 @@ you can even have multiple schedulers using different time units if you need.
 
 
 ## How to take CPU into account? 
-InstantRTOS is CPU independent but you can use all your CPU fuatures with it!
+InstantRTOS is CPU independent but you can use all your CPU features with it!
 You can post to queues and schedule tasks from interrupts when InstantRTOS_EnterCritical and InstantRTOS_LeaveCritical are defined.
-Those macro are also applicable when two RTOSes (InstantRTOS and some other) coexist together. 
-Those macro are the only CPU dependency, but you do not need them when you do not use "advanced features" described above.
+Those macros are also applicable when two RTOSes (InstantRTOS and some other) coexist together. 
+Those macros are the only CPU dependency, but you do not need them when you do not use "advanced features" described above.
 
 ## What about configuring InstantRTOS per my needs?
 See TBD document for tutorial on details.
 
 ## What about saving battery and minimizing power consumption?
-It looks like calling scheduler from infinite loop is not a very efficient way to save battery in any OS.
+It looks like calling a scheduler from an infinite loop is not a very efficient way to save battery in any OS.
 After a call to Scheduler::ExecuteOne or Scheduler::ExecuteAll it is possible to query Scheduler(https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h) for the next schedule time with
 ```cpp
 /// Obtain when next event is going to happen
@@ -144,7 +146,7 @@ and then (depending on your needs) put your device into Deep Sleep or Light Slee
 Once next schedule time is known, one can apply own unique efficient strategy for power saving, depending on wait time needed.
 
 Design note: it would be irrational to embed all the possible Deep Sleep or Light Sleep strategies into the RTOS 
-(and other RTOS'es also do not)), so it is possible to use Scheduler::HasNextTicks to make your own decision. 
+(and other RTOSes also do not)), so it is possible to use Scheduler::HasNextTicks to make your own decision. 
 
 ## Hey, why PascalCase?
 To make InstantRTOS code not look like any other "coding style applicable for embedded", seriously:
@@ -157,7 +159,7 @@ To make InstantRTOS code not look like any other "coding style applicable for em
 ## General utility headers
 
 - [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) - Fast deterministic delegates for invoking callbacks, suitable for real time operation (no heap allocation at all).
-The approach used by [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) is absolutely platform independetnt, only standard C++ is required, this implements fast delegate system for functions, functors and member function pointers, more lightweight then std::function, suitable for embedded platforms.
+The approach used by [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) is absolutely platform independent, only standard C++ is required, this implements fast delegate system for functions, functors and member function pointers, more lightweight then std::function, suitable for embedded platforms.
 
 - [InstantCoroutine.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) - Simple minimalistic coroutines, suitable for all various platforms (like Arduino!) for the case when native C++ coroutines are too heavyweight (or when co_yield and stuff does not work)). Works starting from C++11 (so this can be considered as a nice coroutine implementation for Arduino, as Arduino uses C++11 by default)). NOTE: Coroutine behaves as functor and is perfectly compatible with [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) (one can resume coroutines using [delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h), also [InstantScheduler.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h) can be used to schedule coroutines)
 
