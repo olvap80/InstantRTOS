@@ -95,10 +95,10 @@ and this leads us to next section about priorities.
 Priorities are needed to make "more critical tasks" able "to execute in time" regardless or what "less critical" is doing "right now"!
 Here "regardless of what they do" means even doing ```for(;;){}``` by "less critical task" shall be preempted if needed.
 And "more critical" usually means "a shorter cycle duration results in a higher job priority"
-as suggested by Rate-moonotonic scheduling algorithm.
+as suggested by <a href="https://en.wikipedia.org/wiki/Rate-monotonic_scheduling" target="_blank" nofollow>Rate-monotonic scheduling algorithm</a>.
 
 Naturally in the real case there are shared resources, pending queues (with multiple items waiting in them), etc.
-and so Rate-moonotonic scheduling
+and so Rate-monotonic scheduling
  Priority inversion
 
 TBD on planning and multiple schedulers and on workarounds!
