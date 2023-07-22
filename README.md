@@ -13,6 +13,9 @@ Here word "Instant" stands to the ability for using InstantRTOS parts and patter
 - Easy to integrate with any platform (see samples in corresponding files!)
 - You can take away parts you need (like efficient [Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) and [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h)) and use them separately without RTOS, and even in areas not related to embedded ([Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) and [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) will work perfectly even on desktop)).
 
+Jump to [Frequently Asked Questions](https://github.com/olvap80/InstantRTOS/blob/main/README.md#frequently-asked-questions) to see the motivation behind design decisions for InstantRTOS.
+
+
 # Features implemented so far
 ## General utility headers
 
