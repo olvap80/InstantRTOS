@@ -113,17 +113,19 @@ The exact way of doing CPU context switching between threads is not portable bet
 So regarding preemption: "not yet, but some day in the future as an additional module supporting some platforms"...
 Let's stick with Coroutines for now))
 
-## But is that preemption really needed for every case?
+## But what about cases when preemption is really needed?
+That is why "not yet" instead of "never"))
 
-Sometimes there are arguments looks like "using preemption is cool"... and that is why all those "Active Objects, communicating with each other by asynchronous message passing" and "run to completion" were invented: to overcome synchronization troubles caused by preemption on "cool projects"! "Active Objects" are kind of workaround, where queues are used instead of "traditional" resource protecting mechanisms...
+The main here question is **when preemption is really needed?** 
+
+"Using preemption is cool"... but that is why all those "Active Objects, communicating with each other by asynchronous message passing" and "run to completion" were invented: to overcome synchronization troubles caused by preemption on "cool projects"! "Active Objects" are kind of workaround, where queues are used instead of "traditional" resource protecting mechanisms...
 
 But look: once "each Active Object handles one event at a time" and "runs to completion" this looks like... single threaded execution on single CPU!
 With single physical CPU (like AVR on Arduino) our "Active Object tasks" definitely do not run "in parallel" (they have to "switch" from one to another, either preemptively or cooperatively).
 Thus doing "true" preemption of multiple tasks with CPU context switching leads to... CPU time and memory space wasted!
 
-According to above, with single physical CPU a non-preemptive scheduling will avoid the overhead of synchronization
-needed to protect resources.
-We will avoid overhead since cooperative multitasking leads to smaller memory requirements and less CPU usitization, this is nice and suitable option for embedded devices.
+According to above, with single physical CPU a non-preemptive scheduling will avoid the overhead of synchronization needed to protect shared resources.
+Let's avoid overhead and complexity by using cooperative multitasking to have smaller memory requirements and less CPU usitization. This is nice and suitable option for embedded devices!
 
 The only **real case** when task preemption is really needed, is to let "the more important task to interrupt the less important task",
 and this leads us to the next section about priorities.
