@@ -116,7 +116,7 @@ Let's stick with Coroutines for now))
 ## But what about cases when preemption is really needed?
 That is why "not yet" instead of "never"))
 
-The main here question is **when preemption is really needed?** 
+The main question here is **when that preemption is really needed?** 
 
 "Using preemption is cool"... but that is why all those "Active Objects, communicating with each other by asynchronous message passing" and "run to completion" were invented: to overcome synchronization troubles caused by preemption on "cool projects"! "Active Objects" are kind of workaround, where queues are used instead of "traditional" resource protecting mechanisms...
 
@@ -127,7 +127,7 @@ Thus doing "true" preemption of multiple tasks with CPU context switching leads 
 According to above, with single physical CPU a non-preemptive scheduling will avoid the overhead of synchronization needed to protect shared resources.
 Let's avoid overhead and complexity by using cooperative multitasking to have smaller memory requirements and less CPU usitization. This is nice and suitable option for embedded devices!
 
-The only **real case** when task preemption is really needed, is to let "the more important task to interrupt the less important task",
+The only **real case when task preemption is really needed**, is to let "the more important task to interrupt the less important task",
 and this leads us to the next section about priorities.
 
 
@@ -142,6 +142,11 @@ and even those (beloved by "cool projects") "Active Objects" with their queues o
 According to above the perfect mathematically proven Rate-monotonic scheduling theorem does not work for the real case!
 
 TBD on cooperative multitasking, watchdogs, timeouts planning and multiple schedulers and on workarounds!
+
+
+## Coroutine vs FSM
+
+TODO:
 
 ## Where is HAL? What about registers and peripherals?
 The main components of InstantRTOS do not depend on any hardware/platform/CPU specifics at all, here is why:
