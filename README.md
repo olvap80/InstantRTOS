@@ -74,28 +74,35 @@ Coroutines are nice structural replacement for finite state machines (FSMs), sin
 
 
 ## What about preemption of tasks?
-Multiple "threads of execution" that "run simultaneously and share resources" is the feature leading us to mutexes and semaphores, CAS and memory barriers, (and race conditions, deadlocks and priority inversion)...
-this complicates programming a lot (and hurts CPU performance!) despite the fact that RTOS do their best to help you dealing with all that stuff.
-Usually there are more "threads of execution" then there physical CPUs available!
-Context switches for preempting of some “thread” by “some other thread” on the same CPU are bad (more time to switch, misses in CPU cache, space needed for multiple stacks and storing CPU contexts).
+Multiple "threads of execution" that "run simultaneously and share resources" is the feature leading us to mutexes and semaphores, CAS and memory barriers, (and race conditions, deadlocks, priority inversion)...
+this complicates programming a lot (and hurts CPU performance!) 
+Despite the fact that RTOS do their best to help you dealing with all that stuff, there is a synchronization overhead due to shared resources.
+Also, usually there are more "threads of execution" then there physical CPUs available,
+but context switches for preempting of some “thread” by “some other thread” on the same CPU are bad (more time to switch, misses in CPU cache, space needed for multiple thread stacks and storing CPU contexts).
 The exact way of doing CPU context switching between threads is not portable between different platforms at all, each kind of CPU has own fancy way to do this!
 
 So regarding preemption: "not yet, but some day in the future as an additional module supporting some platforms"...
-But is that preemption really needed for every case?
+Let's stick with Coroutines for now))
 
-Sometimes argument looks like "cool projects use preemption"... and that is why all those "Active Objects, communicating with each other by asynchronous message passing" and "run to completion" were invented: to overcome synchronization troubles caused by preemption on "cool projects"!
+## But is that preemption really needed for every case?
+
+Sometimes there are arguments looks like "using preemption is cool"... and that is why all those "Active Objects, communicating with each other by asynchronous message passing" and "run to completion" were invented: to overcome synchronization troubles caused by preemption on "cool projects"! "Active Objects" are kind of workaround, where queues are used instead of "traditional" resource protecting mechanisms...
 
 But look: once "each Active Object handles one event at a time" and "runs to completion" this looks like... single threaded execution on single CPU!
 With single physical CPU (like AVR on Arduino) our "Active Object tasks" definitely do not run "in parallel" (they have to "switch" from one to another, either preemptively or cooperatively).
 Thus doing "true" preemption of multiple tasks with CPU context switching leads to... CPU time and memory space wasted!
 
-The only **real case** when task preemption is really needed is to let "the more important task to interrupt the less important task",
-and this leads us to the next section about priorities.  
+According to above, with single physical CPU a non-preemptive scheduling will avoid the overhead of synchronization
+needed to protect resources.
+We will avoid overhead since cooperative multitasking leads to smaller memory requirements and less CPU usitization, this is nice and suitable option for embedded devices.
+
+The only **real case** when task preemption is really needed, is to let "the more important task to interrupt the less important task",
+and this leads us to the next section about priorities.
 
 
 ## Then what about task priorities?
 Priorities are needed to make "more critical tasks" able "to execute in time" regardless of what "less critical task" is doing "right now"!
-Here "regardless of what they do" means even doing ```for(;;){}``` by "less critical task" shall be preempted when needed using CPU context switch.
+Here "regardless of what they do" means even doing ```for(;;){}``` by "less critical task" shall be preempted (when needed) using CPU context switch.
 And "more critical" usually means "a shorter cycle duration results in a higher job priority"
 as suggested by the Rate-monotonic scheduling algorithm.
 
