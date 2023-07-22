@@ -13,6 +13,32 @@ Here word "Instant" stands to the ability for using InstantRTOS parts and patter
 - Easy to integrate with any platform (see samples in corresponding files!)
 - You can take away parts you need (like efficient [Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) and [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h)) and use them separately without RTOS, and even in areas not related to embedded ([Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) and [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) will work perfectly even on desktop)).
 
+# Features implemented so far
+## General utility headers
+
+- [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) - Fast deterministic delegates for invoking callbacks, suitable for real time operation (no heap allocation at all).
+The approach used by [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) is absolutely platform independent, only standard C++ is required, this implements fast delegate system for functions, functors and member function pointers, more lightweight then std::function, suitable for embedded platforms.
+
+- [InstantCoroutine.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) - Simple minimalistic coroutines, suitable for all various platforms (like Arduino!) for the case when native C++ coroutines are too heavyweight (or when co_yield and stuff does not work)). Works starting from C++11 (so this can be considered as a nice coroutine implementation for Arduino, as Arduino uses C++11 by default)). NOTE: Coroutine behaves as functor and is perfectly compatible with [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) (one can resume coroutines using [delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h), also [InstantScheduler.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h) can be used to schedule coroutines)
+
+## Timing, intervals and scheduling
+
+- [InstantScheduler.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h) - The simplest possible portable scheduler suitable for embedded platforms like Arduino (actually only standard C++ is required).
+
+- [InstantTimer.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantTimer.h) - Simple timing classes to track timings in platform independent way (this is the most "primitive" and "basic" approach, use it only when [InstantScheduler.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h) does not fit due to some reason)
+
+## Memory and queueing
+
+- [InstantMemory.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantMemory.h) - Simple deterministic memory management utilities (block pools, lifetime management, TBD) suitable for real time, can be used for fast and deterministic memory allocations on Arduino and similar platforms.
+
+- InstantQueue.h (in progress) - Simple deterministic queues suitable for real time TBD.
+
+## Other handy utility stuff
+
+- [InstantDebounce.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDebounce.h) (in progress) - General debouncing
+
+- InstantSignals.h (in progress) - Handle hardware signals being mapped to memory
+
 
 # Frequently Asked Questions
 
@@ -161,32 +187,6 @@ To make InstantRTOS code not look like any other "coding style applicable for em
 - InstantRTOS API call insertions will be visible and distinct from other API calls...
 - All those "k" prefixes and "_S" suffixes are useless! C++ compilers (and IDE) are smart enough to not call enum instead of function or assign structure to int))
 
-
-# Features implemented so far
-## General utility headers
-
-- [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) - Fast deterministic delegates for invoking callbacks, suitable for real time operation (no heap allocation at all).
-The approach used by [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) is absolutely platform independent, only standard C++ is required, this implements fast delegate system for functions, functors and member function pointers, more lightweight then std::function, suitable for embedded platforms.
-
-- [InstantCoroutine.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) - Simple minimalistic coroutines, suitable for all various platforms (like Arduino!) for the case when native C++ coroutines are too heavyweight (or when co_yield and stuff does not work)). Works starting from C++11 (so this can be considered as a nice coroutine implementation for Arduino, as Arduino uses C++11 by default)). NOTE: Coroutine behaves as functor and is perfectly compatible with [InstantDelegate.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) (one can resume coroutines using [delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h), also [InstantScheduler.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h) can be used to schedule coroutines)
-
-## Timing, intervals and scheduling
-
-- [InstantScheduler.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h) - The simplest possible portable scheduler suitable for embedded platforms like Arduino (actually only standard C++ is required).
-
-- [InstantTimer.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantTimer.h) - Simple timing classes to track timings in platform independent way (this is the most "primitive" and "basic" approach, use it only when [InstantScheduler.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantScheduler.h) does not fit due to some reason)
-
-## Memory and queueing
-
-- [InstantMemory.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantMemory.h) - Simple deterministic memory management utilities (block pools, lifetime management, TBD) suitable for real time, can be used for fast and deterministic memory allocations on Arduino and similar platforms.
-
-- InstantQueue.h (in progress) - Simple deterministic queues suitable for real time TBD.
-
-## Other handy utility stuff
-
-- [InstantDebounce.h](https://github.com/olvap80/InstantRTOS/blob/main/InstantDebounce.h) (in progress) - General debouncing
-
-- InstantSignals.h (in progress) - Handle hardware signals being mapped to memory
 
 # Future plans
 TODO (still being invented)
