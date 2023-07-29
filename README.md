@@ -64,7 +64,7 @@ Just copy the parts you need directly into your project)).
 
 
 ## Why not &lt;programming_langulage_name&gt; for RTOS instead of C++?
-Googling in the area of embedded programming leads to answers in C and it is more easy to integrate from C++ than from any other language.
+Googling in the area of embedded programming leads to answers in C and it is more easy to integrate from C++, than from any other language.
 
 Embedded is still around C (and C++), any "exotic" languages are hard to integrate with "plain old C"))
 Those "exotic" languages usually have big runtime, non deterministic garbage collection, 
@@ -118,14 +118,14 @@ That is why "not yet" instead of "never"))
 
 The main question here is **when that preemption is really needed?** 
 
-"Using preemption is cool"... but that is why all those "Active Objects, communicating with each other by asynchronous message passing" and "run to completion" were invented: to overcome synchronization troubles caused by preemption on "cool projects"! "Active Objects" are kind of workaround, where queues are used instead of "traditional" resource protecting mechanisms...
+"Using preemption is cool"... but that is why all those "Active Objects, communicating with each other by asynchronous message passing" and "run to completion" were invented: to overcome synchronization troubles caused by preemption on "cool projects"! "Active Objects" are kind of *workaround*, where queues are used *instead* of "traditional" resource protecting mechanisms...
 
 But look: once "each Active Object handles one event at a time" and "runs to completion" this looks like... single threaded execution on single CPU!
 With single physical CPU (like AVR on Arduino) our "Active Object tasks" definitely do not run "in parallel" (they have to "switch" from one to another, either preemptively or cooperatively).
 Thus doing "true" preemption of multiple tasks with CPU context switching leads to... CPU time and memory space wasted!
 
-According to above, with single physical CPU a non-preemptive scheduling will avoid the overhead of synchronization needed to protect shared resources.
-Let's avoid overhead and complexity by using cooperative multitasking to have smaller memory requirements and less CPU usitization. This is nice and suitable option for embedded devices!
+According to above, **using of non-preemptive scheduling will avoid the overhead of synchronization needed to protect shared resources!**
+Nice and suitable option for embedded devices is to avoid synchronization complexity and preemtion overheads by using cooperative multitasking to have smaller memory requirements and less CPU usitization!
 
 The only **real case when task preemption is really needed**, is to let "the more important task to interrupt the less important task",
 and this leads us to the next section about priorities.
@@ -139,8 +139,14 @@ as suggested by the Rate-monotonic scheduling algorithm.
 
 Naturally in the real case there are shared resources, pending queues (with multiple items waiting in them), etc.
 and even those (beloved by "cool projects") "Active Objects" with their queues of pending messages are not "periodic tasks with unique periods" as it is required by Rate-monotonic scheduling!
-According to above the perfect mathematically proven Rate-monotonic scheduling theorem does not work for the real case!
+They are also not a collection of independent jobs as it is required by Earliest deadline first scheduling...
+According to above the perfect mathematically proven optimal scheduling theorems do not work for the real case!
 
+Naturally for the real case systems Rate-monotonic scheduling of Earliest deadline first scheduling are still used
+together with the extensive use of watchdogs/timeouts followed by extensive testing!
+
+Now let's look at cooperative multitasking, when each tast voluntarily gives up control
+(here voluntarily also means "suspends while waiting for something to happen", and it is a natural and desired condition to make all tasks "waiting for something to happen"!) 
 TBD on cooperative multitasking, watchdogs, timeouts planning and multiple schedulers and on workarounds!
 
 
