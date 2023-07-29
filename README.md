@@ -4,8 +4,8 @@ Easy to use, simple and intuitive.
 Here word "Instant" stands to the ability for using InstantRTOS parts and patterns immediately (even if you have another RTOS running, you can run InstantRTOS from that RTOS))
 
 # Benefits (and goals)
-- Written in C++ 11: type safety and compile time stuff (constexpr), lambda and efficient delegates, RAII (constructors and destructors)/
-- Suitable to work even on small embedded platforms, like Arduino (yes Arduino actually uses C++! and yes, it is possible to write RTOS in C++).
+- RTOS is written in C++ 11 (yes, it is possible to write RTOS in C++!), with type safety and all the compile time stuff (constexpr), lambda and fast efficient delegates, RAII (constructors and destructors).
+- Suitable to work even on small embedded platforms, like Arduino (yes Arduino actually uses C++!).
 - No dependencies (even no standard headers needed) by default.
 - Only standard C++ (does not depend on any platform specifics).
 - Dynamic memory is not required ("heavy" new/delete, malloc/free are not required).
@@ -138,15 +138,27 @@ And "more critical" usually means "a shorter cycle duration results in a higher 
 as suggested by the Rate-monotonic scheduling algorithm.
 
 Naturally in the real case there are shared resources, pending queues (with multiple items waiting in them), etc.
-and even those (beloved by "cool projects") "Active Objects" with their queues of pending messages are not "periodic tasks with unique periods" as it is required by Rate-monotonic scheduling!
+and even those (beloved by "cool projects") "Active Objects" with their queues of pending messages are not "periodic tasks with unique periods" as it is required by the Rate-monotonic scheduling approach!
 They are also not a collection of independent jobs as it is required by Earliest deadline first scheduling...
 According to above the perfect mathematically proven optimal scheduling theorems do not work for the real case!
 
-Naturally for the real case systems Rate-monotonic scheduling of Earliest deadline first scheduling are still used
-together with the extensive use of watchdogs/timeouts followed by extensive testing!
+Naturally for the real systems those Rate-monotonic scheduling of Earliest deadline first scheduling approaches are still considered at design stage,
+as the only way to "reason theoretivally" about rational schedule approach.
+This "theoretical approach" is used together with practical extensive use of watchdogs/timeouts and followed by extensive testing to detect all the stuff that does not fit with "ideal theroy"!
+Extensive testing also helps to detect those "banned, but still possible" issues with ```for(;;){}``` (usually such loop it does not look that simple)!
+NOTE: ```for(;;){}``` and long computation is still considered "bad", even for preemptive systems, and watchdogs/timeouts are used to ensure such computations do not cause system to miss critical deadlines!
+"High priority long computation" is a problem, because it delays lower proority tasks and "low proority long computation" is still a problem when it is done under critical section (priority inversion) or when high priority task waits for lower priority "Active Object" to process the request (obvious design error but still "accidentally" possible in complex systems).
 
-Now let's look at cooperative multitasking, when each tast voluntarily gives up control
-(here voluntarily also means "suspends while waiting for something to happen", and it is a natural and desired condition to make all tasks "waiting for something to happen"!) 
+Now let's look at cooperative multitasking, when each tast voluntarily gives up control.
+Here the word "voluntarily" **also means** "*task suspends while waiting for something to happen*", and, (not) surprisingly, it is a **natural and desired condition** for any embedded application to make all tasks (even those, that are peemptive) "waiting for something to happen" instead of continuously running))! Now we can consider there are only two states for the cooperative task (coroutine): resumed (executing/running) and suspended (voluntarily gives up control/waits).
+
+For cooperative multitasking we can treat any execution between resume and suspend as "mutex locking everythind" or "global task lock".
+Once the cooperative task (coroutine) is resumed, we can consider it owns that "global task lock", and once it yealds we can consider it as releasing this "global task lock"
+(and naturally you do not have to use any mutexes with cooperative multitasking at all, you own "global task lock" by default once you execute the code).
+
+The shortest is the time coroutine is being executed (resumed) the more it looks like... 
+```for(;;){}```
+
 TBD on cooperative multitasking, watchdogs, timeouts planning and multiple schedulers and on workarounds!
 
 
