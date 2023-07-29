@@ -143,7 +143,7 @@ They are also not a collection of independent jobs as it is required by Earliest
 According to the above the perfect mathematically proven optimal scheduling theorems do not work for the real case!
 
 Naturally for the real systems those "Rate-monotonic scheduling" or "Earliest deadline first scheduling" approaches are still considered at design stage,
-as _**the only way** to "reason theoretically" about establishing rational schedule approach_.
+as _**the only way** to "reason theoretically" about establishing a rational schedule approach_.
 This "theoretical approach" is used together with practical extensive use of watchdogs/timeouts/asserts and followed by extensive testing to detect all the stuff that does not fit with "ideal theory"!
 Extensive testing also helps to detect those "banned, but still possible" issues with ```for(;;){}``` (usually such "unwanted" loops do not look that simple!).
 NOTE: ```for(;;){}``` and long computation is still considered "bad", even for preemptive systems, and watchdogs/timeouts are used to ensure such computations do not cause the system to miss critical deadlines!
@@ -227,7 +227,7 @@ and then (depending on your needs) put your device into Deep Sleep or Light Slee
 Once next schedule time is known, one can apply own unique efficient strategy for power saving, depending on the wait time needed.
 
 Design note: it would be irrational to embed all the possible Deep Sleep or Light Sleep strategies into the RTOS 
-(and other RTOSes also do not)), so it is possible to use Scheduler::HasNextTicks to make your own decision. 
+(and other RTOSes also do not)), so it was mede possible to use Scheduler::HasNextTicks to make your own decision. 
 
 ## Hey, why PascalCase?
 To make InstantRTOS code not look like any other "coding style applicable for embedded", seriously:
