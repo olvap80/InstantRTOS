@@ -1,6 +1,6 @@
 # [InstantRTOS](https://github.com/olvap80/InstantRTOS) simple lightweight RTOS + utility for embedded platforms
 Header-only, minimalistic real time operating system, with fast and handy utility classes, without any dependencies.
-Easy to use, simple and intuitive.
+Easy to use, simple and intuitive, small footprint, fast response portable RTOS, .
 Here word "Instant" stands to the ability for using InstantRTOS parts and patterns immediately (even if you have another RTOS running, you can run InstantRTOS from that RTOS))
 
 # Benefits (and goals)
@@ -10,8 +10,8 @@ Here word "Instant" stands to the ability for using InstantRTOS parts and patter
 - Only standard C++ (does not depend on any platform specifics).
 - Dynamic memory is not required ("heavy" new/delete, malloc/free are not required).
 - Each file contains usage samples, every API is documented with doxygen.
-- Easy to integrate with any platform (see samples in corresponding files!)
-- You can take away parts you need (like efficient [Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) and [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h)) and use them separately without RTOS, and even in areas not related to embedded ([Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) and [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) will work perfectly even on desktop)).
+- Portable RTOS, wasy to integrate with any platform (see samples in corresponding files!)
+- Modulatity: you can take only the parts you need (like efficient [Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) and [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h)) and use them separately without RTOS, and even in the areas not related to embedded ([Delegates](https://github.com/olvap80/InstantRTOS/blob/main/InstantDelegate.h) and [Coroutines](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) will work perfectly even on desktop)).
 
 Jump to [Frequently Asked Questions](https://github.com/olvap80/InstantRTOS/blob/main/README.md#frequently-asked-questions) to see the motivation behind design decisions for InstantRTOS.
 
@@ -176,15 +176,15 @@ TBD on cooperative multitasking, watchdogs, timeouts *planning and multiple sche
 TODO: problem "too much time for sequential execution of every coroutine for some more important tasks" (do we really need multiple schedulers? maybe one is enough just because tasks insers self to it on the right place?)
 "short enough resume" vs "tasks in time" and "task importance" 
 tasks are enqueued, main difference from EDF!
-(those tasks that have more important deadlines vs those scheduled for "specific time", execution loops)
+(those tasks that have more important deadlines vs those scheduled for "specific time" but "can wait", execution loops)
 
 
 howto with multiple schedulers
-design note: maybe one "default global sheduler"?
+design note: why not "one default global sheduler"?
 
 ## Coroutine vs FSM
 
-TODO: active object and switch(message) criticism, state machine criticism, state machines vs flowcharts (state switching the same as goto, etc)
+TODO: active object and switch(message) criticism, state machine criticism, state machines vs flowcharts (state switching "from any state to any state" is the same as goto, etc)
 
 ## Where is HAL? What about registers and peripherals?
 The main components of InstantRTOS do not depend on any hardware/platform/CPU specifics at all, here is why:
