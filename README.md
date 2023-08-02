@@ -1,6 +1,6 @@
 # [InstantRTOS](https://github.com/olvap80/InstantRTOS) simple lightweight RTOS + utility for embedded platforms
 Header-only, minimalistic real time operating system, with fast and handy utility classes, without any dependencies.
-Easy to use, simple and intuitive, small footprint, fast response portable RTOS, .
+Easy to use, simple and intuitive, small footprint, fast response, portable RTOS.
 Here word "Instant" stands to the ability for using InstantRTOS parts and patterns immediately (even if you have another RTOS running, you can run InstantRTOS from that RTOS))
 
 # Benefits (and goals)
@@ -98,7 +98,7 @@ for small embedded platforms.
 In contrast the simplest [Coroutine in InstantRTOS](https://github.com/olvap80/InstantRTOS/blob/main/InstantCoroutine.h) 
 requires only sizeof(short) for holding its own state and no dynamic memory allocation.
 
-InstantRTOS implements low-memory, fast-switching stackless coroutines to do cooperative multitasking efficiently on any platform.
+InstantRTOS implements low-memory, fast-switching stackless coroutines (cooperative tasks) to do cooperative multitasking efficiently on any platform.
 Coroutines are nice structural replacement for finite state machines (FSMs), since natural flow control statements are used instead of the mess of state/event transitions.
 
 
@@ -111,7 +111,7 @@ but context switches for preempting of some “thread” by “some other thread
 The exact way of doing CPU context switching between threads is not portable between different platforms at all, each kind of CPU has own fancy way to do this!
 
 So regarding preemption: "not yet, but some day in the future as an additional module supporting some platforms"...
-Let's stick with Coroutines for now))
+Let's stick with Coroutines/Cooparative Tasks for now))
 
 ## But what about cases when preemption is really needed?
 That is why "not yet" instead of "never"))
@@ -150,10 +150,10 @@ NOTE: ```for(;;){}``` and long computation is still considered "bad", even for p
 "High priority long computation" is a problem, because it delays lower priority tasks and "low priority long computation" is still a problem when it is done under critical section (priority inversion) or when high priority task waits for lower priority "Active Object" to process the request (obvious design error but still "accidentally" possible in complex systems).
 
 Now let's look at **cooperative multitasking**, when each task voluntarily gives up control.
-Here the word "voluntarily" **also means** "*task suspends while waiting for something to happen*", and, (not) surprisingly, it is a **natural and desired condition** for any embedded application to make all tasks (even those, that are preemptive) "waiting for something to happen" instead of continuously running))! Now we can consider there are only two states for the cooperative task (coroutine): resumed (executing/running) and suspended (voluntarily gives up control/waits).
+Here the word "voluntarily" **also means** "*task suspends while waiting for something to happen*", and, (not) surprisingly, it is a **natural and desired condition** for any embedded application to make all tasks (even those, that are preemptive) "waiting for something to happen" instead of continuously running))! Now we can consider there are only two states for each Cooperative Task (Coroutine): resumed (executing/running) and suspended (voluntarily gives up control/waits).
 
 For cooperative multitasking we can treat any execution between "resume" and "suspend" as "mutex locking everything" or "global task lock".
-Once the cooperative task (coroutine) is resumed, we can consider it owns that "global task lock", and once it "yields to scheduler" we can consider it as releasing this "global task lock".
+Once some Cooperative Task (coroutine) is resumed, we can consider it owns that "global task lock", and once it "yields to scheduler" we can consider it as releasing this "global task lock".
 The shortest is the time coroutine is being executed (in resumed state), the less time that "global task lock" is "locked" and the more it looks like... preemptive system...
 And then all the approaches used for preemptive systems can also apply: "theoretical approach" (RMS or EDF) and "practical approach" (timeouts, watchdogs and extensive testing))!
 
@@ -164,7 +164,7 @@ On the other hand cooperative multitasking has obvious advantages: under our ima
 Natural approach for our cooperative system is to use scheduling based on the "Earliest deadline first"
 to resume "the most urgent task earlier", this looks like "using dynamic priorities" but there are no "task priorities" at all (you can easily introduce some prioritization, see below!)
 we just resume tasks in their "straightforward order")).
-In our case we will simplify approach from the above even more: cooperative tasks (coroutines) are _resumed in the order as they were scheduled and run "till the next yield"_.
+In our case we will simplify approach from the above even more: Cooperative Tasks (Coroutines) are _resumed in the order as they were scheduled and run "till the next yield"_.
 This is "a little bit different" than "task shall be completed till this deadline time", but still enough "theoretical ground" to start with, before proceeding _in practice_ with timeouts, watchdogs, asserts and extensive testing)).
 (I know perfect CS academist will cry bloody tears while seeing those "simplifications", but such similar "simplifications" is what real life RTOS/embedded system developers actually do, 
 ... and that is why timeouts/watchdogs/asserts/extensive are *always* needed to refine theoretically built constructions
@@ -173,7 +173,7 @@ This is "a little bit different" than "task shall be completed till this deadlin
 ## More important and less important tasks (priorities for cooperative world)
 TBD on cooperative multitasking, watchdogs, timeouts *planning and multiple schedulers* and on workarounds!
 
-TODO: problem "too much time for sequential execution of every coroutine for some more important tasks" (do we really need multiple schedulers? maybe one is enough just because tasks insers self to it on the right place?)
+TODO: problem "too much time for sequential execution of every Cooperative Task (coroutine) for some more important tasks" (do we really need multiple schedulers? maybe one is enough just because tasks insers self to it on the right place?)
 "short enough resume" vs "tasks in time" and "task importance" 
 tasks are enqueued, main difference from EDF!
 (those tasks that have more important deadlines vs those scheduled for "specific time" but "can wait", execution loops)
@@ -185,6 +185,7 @@ design note: why not "one default global sheduler"?
 ## Coroutine vs FSM
 
 TODO: active object and switch(message) criticism, state machine criticism, state machines vs flowcharts (state switching "from any state to any state" is the same as goto, etc)
+TODO: case when FSMs are really needed (and what about hierarhical FSMs?)
 
 ## Where is HAL? What about registers and peripherals?
 The main components of InstantRTOS do not depend on any hardware/platform/CPU specifics at all, here is why:
@@ -242,6 +243,10 @@ It is intended that future changes will not break any existing functionality.
 
 Plans so far
 - Complete queues and their variations
+- Complete with platform independent debouncing
 - Add preemption for some platforms (and stuff around)
+- FSM support (for those cases when FSMs/automata programming are "musthave")
+- "Native" C++ Coroutines and workarounds for their problems
+- Tutorial!!!
 - ...
 - TODO (still being invented)
