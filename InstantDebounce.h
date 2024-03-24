@@ -2,111 +2,116 @@
     @brief General debouncing independent of CPU and platform
            can be used for debouncing button states or any other chattering value
 
-    There are two approaches for debouncing:
+There are two approaches for debouncing:
 
-        - use DebounceAction or ButtonAction detecting new debounced value
-          with the help of the scheduler (the preferred way!)
+    - use DebounceAction or ButtonAction detecting new debounced value
+        with the help of the scheduler (the preferred way!)
 
-        - "Discover" debounced value with SimpleDebounce 
-           by checking for debounced state "manually" in a loop
-          (the "straight forward" way of iterative checks without Scheduler
-          this time value in ticks/milliseconds/microseconds has to be provided
-          "manually" by the user)
-        
+    - "Discover" debounced value with SimpleDebounce 
+        by checking for debounced state "manually" in a loop
+        (the "straight forward" way of iterative checks without Scheduler
+        this time value in ticks/milliseconds/microseconds has to be provided
+        "manually" by the user)
     
-    Both approaches are covered in samples below.
 
-    Simple demo for debouncing button with "Discover" approach control LED and beep))
-    @code
-        // Pin where button is connected (as INPUT_PULLUP)
-        #define BUTTON_PIN 2
-        // INPUT_PULLUP makes pressed button value LOW
-        bool IsButtonPressed(){
-            return digitalRead(BUTTON_PIN) == LOW;
-        }
-        // assume we use micros for debouncing
-        SimpleDebounce button(false, 50000);
+Both approaches are covered in samples below.
 
-        #define LED_ON  digitalWrite(LED_BUILTIN, HIGH)
-        #define LED_OFF digitalWrite(LED_BUILTIN, LOW)
+Simple demo for debouncing button with "Discover" approach control LED and beep))
+ @code
+    // Pin where button is connected (as INPUT_PULLUP)
+    #define BUTTON_PIN 2
+    // INPUT_PULLUP makes pressed button value LOW
+    bool IsButtonPressed(){
+        return digitalRead(BUTTON_PIN) == LOW;
+    }
+    // assume we use micros for debouncing
+    SimpleDebounce button(false, 50000);
 
-        //Pin with beeper
-        #define BEEP_PIN 4
+    #define LED_ON  digitalWrite(LED_BUILTIN, HIGH)
+    #define LED_OFF digitalWrite(LED_BUILTIN, LOW)
 
-        namespace{
-            // For demo purposes generate frequency directly from the code
-            PeriodicTimer beep_timer;
-            // Used to toggle value on BEEP_PIN
-            bool beepState = false;
-        }
+    //Pin with beeper
+    #define BEEP_PIN 4
 
-        void setup() {
-            Serial.begin(115200);
-            // remember SimpleTimer is initially "expired", 
-            //so we will immediately enter condition
+    namespace{
+        // For demo purposes generate frequency directly from the code
+        PeriodicTimer beep_timer;
+        // Used to toggle value on BEEP_PIN
+        bool beepState = false;
+    }
 
-            pinMode(BUTTON_PIN, INPUT_PULLUP);
-            
-            pinMode(LED_BUILTIN, OUTPUT);
-            pinMode(BEEP_PIN, OUTPUT);
+    void setup() {
+        Serial.begin(115200);
+        // remember SimpleTimer is initially "expired", 
+        //so we will immediately enter condition
 
-            //Note: timer_led is initially expired, so we will enter under if
-            
-            beep_timer.StartPeriod(micros(), 500);
-        }
+        pinMode(BUTTON_PIN, INPUT_PULLUP);
+        
+        pinMode(LED_BUILTIN, OUTPUT);
+        pinMode(BEEP_PIN, OUTPUT);
 
-        void loop() {
-            auto us = micros();
-            if( button.Discover(us, IsButtonPressed()) ){
-                Serial.print(F("Button state just changed to:"));
+        //Note: timer_led is initially expired, so we will enter under if
+        
+        beep_timer.StartPeriod(micros(), 500);
+    }
 
-                if( button.Value() ){
-                    Serial.println(F("PRESSED"));
-                    LED_ON;
-                }
-                else{
-                    Serial.println(F("RELEASED"));
-                    LED_OFF;
-                }
-            }
-            //else means button debounced state did not change
+    void loop() {
+        auto us = micros();
+        if( button.Discover(us, IsButtonPressed()) ){
+            Serial.print(F("Button state just changed to:"));
 
-            // checked on each iteration
             if( button.Value() ){
-                //use timer to simulate beep (for demo purposes))
-                if( beep_timer.Discover(us) ){
-                    digitalWrite(BEEP_PIN, beepState);
-                    beepState = !beepState;
-                }
+                Serial.println(F("PRESSED"));
+                LED_ON;
+            }
+            else{
+                Serial.println(F("RELEASED"));
+                LED_OFF;
             }
         }
-    @endcode
+        //else means button debounced state did not change
+
+        // checked on each iteration
+        if( button.Value() ){
+            //use timer to simulate beep (for demo purposes))
+            if( beep_timer.Discover(us) ){
+                digitalWrite(BEEP_PIN, beepState);
+                beepState = !beepState;
+            }
+        }
+    }
+ @endcode
 
 
-    NOTE: both InstantTimer.h and InstantScheduler.h are also platform independent
-          InstantDebounce.h will automatically include existing one :) 
+NOTE: both InstantTimer.h and InstantScheduler.h are also platform independent
+      InstantDebounce.h will automatically include existing one :) 
 
-    MIT License
+NOTE: InstantDebounce.h class instances inherit interrupt (thread) safety 
+      from corresponding InstantScheduler.h file settings.
+      Option with InstantTimer.h (SimpleDebounce) is intended to be used
+      from the same thread (see sample with button.Discover above)
 
-    Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
+MIT License
 
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
+Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
 
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 
@@ -318,7 +323,7 @@ public:
 
     /// Take the new time and value into account
     /** Called with current value on each iteration,
-     * \returns true if new (different) value is detected ("discovered")
+     * @returns true if new (different) value is detected ("discovered")
      *          after the debounce cycle was performed
      *  (returned value can be used to detect state change) */
     bool Discover(

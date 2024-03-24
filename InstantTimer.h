@@ -1,95 +1,98 @@
 /** @file InstantTimer.h
-    @brief Simple timing classes to track timings in platform independent way
+ @brief Simple timing classes to track timings in platform independent way
 
-    Simple platform independent time counting, without any dependencies,
-    straight forward implementation to use directly from program loop,
-    follows absolute minimalism to be cheap by memory and functionality.
-    (Note: consider InstantScheduler.h when you need some more complex scheduling))
+Simple platform independent time counting, without any dependencies,
+straight forward implementation to use directly from program loop,
+follows absolute minimalism to be cheap by memory and functionality.
+(Note: consider InstantScheduler.h when you need some more complex scheduling))
 
-    
-    The InstantTimer.h implements following:
-    
-        - SimpleTimer is resettable "one shot" timer 
-                      that avoids burden of manual interval counting
-                      (timer can be scheduled again later)
-        - PeriodicTimer is autoreset "multi shot" timer to generate
-                        periodic events in fixed interval
-    
-    Ideal for single treaded environment, see sample below for details.
-    @code
-        SimpleTimer timer_led;
-        bool ledState = false;
 
-        #define LED_ON  digitalWrite(LED_BUILTIN, HIGH)
-        #define LED_OFF digitalWrite(LED_BUILTIN, LOW)
+The InstantTimer.h implements following:
 
-        PeriodicTimer periodic_timer_signal;
-        #define SIGNAL_PIN 4
-        bool signalState = false;
+    - SimpleTimer is resettable "one shot" timer 
+                    that avoids burden of manual interval counting
+                    (timer can be scheduled again later)
+    - PeriodicTimer is autoreset "multi shot" timer to generate
+                    periodic events in fixed interval
 
-        void setup() {
-            Serial.begin(115200);
+Ideal for single treaded environment, see sample below for details.
+ @code
+    SimpleTimer timer_led;
+    bool ledState = false;
 
-            pinMode(LED_BUILTIN, OUTPUT);
-            pinMode(SIGNAL_PIN, OUTPUT);
+    #define LED_ON  digitalWrite(LED_BUILTIN, HIGH)
+    #define LED_OFF digitalWrite(LED_BUILTIN, LOW)
 
-            //Note: timer_led is initially expired, so we will enter under if
-            
-            auto us = micros();
-            timer_led.Start(us, 1000000);
-            periodic_timer_signal.StartPeriod(us, 500);
-        }
+    PeriodicTimer periodic_timer_signal;
+    #define SIGNAL_PIN 4
+    bool signalState = false;
 
-        void loop() {
-            auto us = micros();
-            if( timer_led.Discover(us) ){
-                if(!ledState){
-                    LED_ON;
-                }
-                else{
-                    LED_OFF;
-                }
-                ledState = !ledState;
-                //need to "charge" simple timer every time 
-                timer_led.Start(us, 1000000);
-            }
-            if( !ledState ){
-                Serial.println(F("1"));
+    void setup() {
+        Serial.begin(115200);
+
+        pinMode(LED_BUILTIN, OUTPUT);
+        pinMode(SIGNAL_PIN, OUTPUT);
+
+        //Note: timer_led is initially expired, so we will enter under if
+        
+        auto us = micros();
+        timer_led.Start(us, 1000000);
+        periodic_timer_signal.StartPeriod(us, 500);
+    }
+
+    void loop() {
+        auto us = micros();
+        if( timer_led.Discover(us) ){
+            if(!ledState){
+                LED_ON;
             }
             else{
-                Serial.println(F("0"));
+                LED_OFF;
             }
-
-            //PeriodicTimer is "recharged" automatically 
-            if( periodic_timer_signal.Discover(us) ){
-                digitalWrite(SIGNAL_PIN, signalState);
-                signalState = !signalState;
-            }
+            ledState = !ledState;
+            //need to "charge" simple timer every time 
+            timer_led.Start(us, 1000000);
         }
-    @endcode
+        if( !ledState ){
+            Serial.println(F("1"));
+        }
+        else{
+            Serial.println(F("0"));
+        }
+
+        //PeriodicTimer is "recharged" automatically 
+        if( periodic_timer_signal.Discover(us) ){
+            digitalWrite(SIGNAL_PIN, signalState);
+            signalState = !signalState;
+        }
+    }
+ @endcode
 
 
-    MIT License
+NOTE: InstantTimer.h is intended to be used from the same thread
+      (see sample with timer_led.Discover above)
 
-    Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
+MIT License
 
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
+Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
 
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 
@@ -175,7 +178,7 @@ public:
 
     /// Test timer is expired without altering state (time is not checked!)
     /** Reads existing state (as calculated by the most recent Discover() call)
-     * \returns false only between Start and expiration moment,
+     * @returns false only between Start and expiration moment,
      *          true is returned before Start() of after Expire.
      * 
      * Remember one must periodically call Discover() API to detect expiration!

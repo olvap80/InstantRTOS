@@ -2,169 +2,177 @@
     @brief Simple deterministic memory management utilities suitable for real time
     can be used for dynamic memory allocations on Arduino and similar platforms.
 
-    (c) see https://github.com/olvap80/InstantRTOS
+(c) see https://github.com/olvap80/InstantRTOS
 
-    Zero dependencies, works instantly by copy pasting to your project...
-    Inspired by memory management toolset available in various RTOSes,
-    and now available in C++ :)
+Zero dependencies, works instantly by copy pasting to your project...
+Inspired by memory management toolset available in various RTOSes,
+and now available in C++ :)
 
-    The BlockPool is intended to be allocated statically and then used
-    for memory allocation.
-    
-    Sample usage
-    @code
-        //actual block pool (place is allocated statically)
-        BlockPool<
-            sizeof(SomeClass), //size of single block 
-            10        //maximum number of blocks
-        > blockPool;
+The BlockPool is intended to be allocated statically and then used
+for memory allocation.
 
+Sample usage
+ @code
+    //actual block pool (place is allocated statically)
+    BlockPool<
+        sizeof(SomeClass), //size of single block 
+        10        //maximum number of blocks
+    > blockPool;
+
+    ...
+
+    void loop() {
         ...
+
+        auto ptr = blockPool.Allocate<SomeClass>();
+        ...
+        blockPool.Free(ptr);
+        ...
+    }
+ @endcode
+
+The LifetimeManager can be used to explicitly allocate/deallocate single 
+instance (manage object lifetime manually), see sample:
+
+ @code
+    LifetimeManager<SomeClass> manualManagement;
+    LifetimeManager<SomeOtherClass> useAsSingleton;
+
+    ...
 
         void loop() {
-            ...
-
-            auto ptr = blockPool.Allocate<SomeClass>();
-            ...
-            blockPool.Free(ptr);
-            ...
-        }
-    @endcode
-
-    The LifetimeManager can be used to explicitly allocate/deallocate single 
-    instance (manage object lifetime manually), see sample:
-
-    @code
-        LifetimeManager<SomeClass> manualManagement;
-        LifetimeManager<SomeOtherClass> useAsSingleton;
-
         ...
 
-         void loop() {
-            ...
+        manualManagement.Emplace("Some parameter", 42); //lifetime started
+        ...
+        manualManagement->SomeAction(); //continues
+        ...
+        manualManagement.Destroy(); //ended
+        
+        ...
+        useAsSingleton.Singleton().DoSomethingElse(); //create if not exists
+    }
+ @endcode
 
-            manualManagement.Emplace("Some parameter", 42); //lifetime started
-            ...
-            manualManagement->SomeAction(); //continues
-            ...
-            manualManagement.Destroy(); //ended
-            
-            ...
-            useAsSingleton.Singleton().DoSomethingElse(); //create if not exists
-        }
-    @endcode
+There is a LifetimeManagerScope macro to allow RAII for LifetimeManager,
+so that you do not need to call Emplace and Destroy manually.
+The LifetimeManagerScope does not create variable on stack, thus it is
+ideal option to work in pair with InstantCoroutine.h allowing object
+life time management and coroutine nesting, see sample below:
+ @code
+    #include "InstantCoroutine.h"
+    #include "InstantMemory.h"
 
-    There is a LifetimeManagerScope macro to allow RAII for LifetimeManager,
-    so that you do not need to call Emplace and Destroy manually.
-    The LifetimeManagerScope does not create variable on stack, thus it is
-    ideal option to work in pair with InstantCoroutine.h allowing object
-    life time management and coroutine nesting, see sample below:
-    @code
-        #include "InstantCoroutine.h"
-        #include "InstantMemory.h"
+    CoroutineDefine( SequenceOfSquares ) {
+        int i = 0;
+        CoroutineBegin(int)
+            for ( ;; ++i){
+                CoroutineYield( i*i );
+            }
+        CoroutineEnd()
+    };
+    CoroutineDefine( SequenceOfCubes ) {
+        int i = 0;
+        CoroutineBegin(int)
+            for ( ;; ++i){
+                CoroutineYield( i*i*i );
+            }
+        CoroutineEnd()
+    };
 
-        CoroutineDefine( SequenceOfSquares ) {
-            int i = 0;
-            CoroutineBegin(int)
-                for ( ;; ++i){
-                    CoroutineYield( i*i );
-                }
-            CoroutineEnd()
-        };
-        CoroutineDefine( SequenceOfCubes ) {
-            int i = 0;
-            CoroutineBegin(int)
-                for ( ;; ++i){
-                    CoroutineYield( i*i*i );
-                }
-            CoroutineEnd()
-        };
+    template<class T>
+    CoroutineDefine( Range ) {
+        T current, last;
+    public:
+        Range(T beginFrom, T endWith) : current(beginFrom), last(endWith) {}
 
-        template<class T>
-        CoroutineDefine( Range ) {
-            T current, last;
-        public:
-            Range(T beginFrom, T endWith) : current(beginFrom), last(endWith) {}
+        CoroutineBegin(T)
+            for(; current < last; ++current){
+                CoroutineYield( current );
+            }
+            CoroutineStop(last);
+        CoroutineEnd()
+    };
 
-            CoroutineBegin(T)
-                for(; current < last; ++current){
-                    CoroutineYield( current );
-                }
-                CoroutineStop(last);
-            CoroutineEnd()
-        };
-
-        CoroutineDefine( UseOtherCoroutines ) {
-            LifetimeManager< Range<int8_t> > range;
-            LifetimeManager<SequenceOfSquares> sequenceOfSquares;
-            LifetimeManager<SequenceOfCubes> sequenceOfCubes;
-            
-            CoroutineBegin(void)
-                for ( ;; ){
-                    Serial.println(F("------ ITERATION STARTED -----"));
-                    Serial.println(F("Printing squares:"));
-                    LifetimeManagerScope(sequenceOfSquares){
-                        LifetimeManagerScope(range, 0, 10){
-                            while( *range ){
-                                Serial.print( (*range)() );
-                                Serial.print( ':' );
-                                Serial.println( (*sequenceOfSquares)() );
-                                CoroutineYield();
-                            }
-                        }
-                    }
-
-                    Serial.println(F("Printing cubes:"));
-                    CoroutineYield();
-
-                    LifetimeManagerScope(sequenceOfCubes){
-                        LifetimeManagerScope(range, 0, 15){
-                            while( *range ){
-                                Serial.print( (*range)() );
-                                Serial.print( ':' );
-                                Serial.println( (*sequenceOfCubes)() );
-                                CoroutineYield();
-                            }
+    CoroutineDefine( UseOtherCoroutines ) {
+        LifetimeManager< Range<int8_t> > range;
+        LifetimeManager<SequenceOfSquares> sequenceOfSquares;
+        LifetimeManager<SequenceOfCubes> sequenceOfCubes;
+        
+        CoroutineBegin(void)
+            for ( ;; ){
+                Serial.println(F("------ ITERATION STARTED -----"));
+                Serial.println(F("Printing squares:"));
+                LifetimeManagerScope(sequenceOfSquares){
+                    LifetimeManagerScope(range, 0, 10){
+                        while( *range ){
+                            Serial.print( (*range)() );
+                            Serial.print( ':' );
+                            Serial.println( (*sequenceOfSquares)() );
+                            CoroutineYield();
                         }
                     }
                 }
-            CoroutineEnd()
-        };
 
-        //The coroutine using other coroutines
-        UseOtherCoroutines useOtherCoroutines;
+                Serial.println(F("Printing cubes:"));
+                CoroutineYield();
 
-        void setup() {
-            Serial.begin(9600);
-        }
+                LifetimeManagerScope(sequenceOfCubes){
+                    LifetimeManagerScope(range, 0, 15){
+                        while( *range ){
+                            Serial.print( (*range)() );
+                            Serial.print( ':' );
+                            Serial.println( (*sequenceOfCubes)() );
+                            CoroutineYield();
+                        }
+                    }
+                }
+            }
+        CoroutineEnd()
+    };
 
-        void loop() {
-            useOtherCoroutines();
-            delay( 200 );
-        }
-    @endcode
+    //The coroutine using other coroutines
+    UseOtherCoroutines useOtherCoroutines;
 
-    MIT License
+    void setup() {
+        Serial.begin(9600);
+    }
 
-    Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
+    void loop() {
+        useOtherCoroutines();
+        delay( 200 );
+    }
+ @endcode
 
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
+NOTE: InstantMemory.h is configurable for interrupt (thread) safety.
+      It is always safe to use the same object from the same thread.
+      (different objects used from different threads will work as well).
+      It is safe to use the same object from different threads/interrupts
+      only if that interrupt (thread) safety is configured, see below
 
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+Deterministic memory allocation ald lifetime management suitable for real time 
+MIT License
+
+Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 #ifndef InstantMemory_INCLUDED_H
@@ -174,75 +182,87 @@
 //______________________________________________________________________________
 // Portable configuration (just skip to "Classes for memory operations" below))
 
-//#define InstantMemory_BlockPoolCountInMetadata
+#define InstantMemory_BlockPoolCountInMetadata
 
 /* Keep promise to not use any standard libraries by default, 
-Enable defines below to allow standard library instead of own implementation */
-//#define InstantRTOS_USE_STDLIB
-#ifdef InstantRTOS_USE_STDLIB
+   but types from those header still must have */
+#if defined(InstantRTOS_USE_STDLIB) || defined(__has_include)
 
 #   if __has_include(<cstddef>)
 #       include <cstddef>
-        //remember uintptr_t is optional per https://en.cppreference.com/w/cpp/types/integer
         using std::size_t;
+#       define INSTANTMEMORY_SIZE_T size_t
 #   else
 #       include <stddef.h>
+#       define INSTANTMEMORY_SIZE_T size_t
 #   endif
 
 #   if __has_include(<cstdint>)
 #       include <cstdint>
+        //remember uintptr_t is optional per https://en.cppreference.com/w/cpp/types/integer
         using std::uintptr_t;
+#       define INSTANTMEMORY_UINTPTR_T uintptr_t
 #   else
 #       include <stdint.h>
+#       define INSTANTMEMORY_UINTPTR_T uintptr_t
 #   endif
 
-#   define INSTANTMEMORY_SIZE_T size_t
-#   define INSTANTMEMORY_UINTPTR_T uintptr_t
-
 #   if __has_include(<new>)
-    //this header is present even on avr
-#   include <new>
-#else
-#   include <new.h>
+        //this header is present even on avr
+#       include <new>
+        //hack to replace class for the case when custom placement new is not needed
+#       define InstantMemoryPlaceholderHelper(ptr) ptr
+#   else
+#       include <new.h>
+        //hack to replace class for the case when custom placement new is not needed
+#       define InstantMemoryPlaceholderHelper(ptr) ptr
+#   endif
+
 #endif
 
-//hack to replace class for the case when custom placement new is not needed
-#define InstantMemoryPlaceholderHelper(ptr) ptr
 
-#else
-
+#if !defined(INSTANTMEMORY_SIZE_T)
 #   define INSTANTMEMORY_SIZE_T unsigned
+    static_assert(
+        sizeof(INSTANTMEMORY_SIZE_T) == sizeof( sizeof(INSTANTMEMORY_SIZE_T) ),
+        "The INSTANTMEMORY_SIZE_T shall have the same size as the result of sizeof"
+    );
+#endif
+#if !defined(INSTANTMEMORY_UINTPTR_T)
 #   define INSTANTMEMORY_UINTPTR_T unsigned
+    static_assert(
+        sizeof(INSTANTMEMORY_UINTPTR_T) >= sizeof( void* ),
+        "The INSTANTMEMORY_UINTPTR_T shall be large enough to hold pointer"
+    );
+#endif
 
-static_assert(
-    sizeof(INSTANTMEMORY_SIZE_T) == sizeof( sizeof(INSTANTMEMORY_SIZE_T) ),
-    "The INSTANTMEMORY_SIZE_T shall have the same size as the result of sizeof"
-);
-static_assert(
-    sizeof(INSTANTMEMORY_UINTPTR_T) >= sizeof( void* ),
-    "The INSTANTMEMORY_UINTPTR_T shall be large enough to hold pointer"
-);
+#if !defined(InstantMemoryPlaceholderHelper)
+    /// Helper class to allow custom placement new without conflicts 
+    class InstantMemoryPlaceholderHelper{
+    public:
+        InstantMemoryPlaceholderHelper(void *placeForAllocation) : ptr(placeForAllocation) {} 
+    private:
+        void *ptr;
+        friend void* operator new(INSTANTMEMORY_SIZE_T, InstantMemoryPlaceholderHelper place) noexcept; 
+    };
 
-/// Helper class to allow custom placement new without conflicts 
-class InstantMemoryPlaceholderHelper{
-public:
-    InstantMemoryPlaceholderHelper(void *placeForAllocation) : ptr(placeForAllocation) {} 
-private:
-    void *ptr;
-    friend void* operator new(INSTANTMEMORY_SIZE_T, InstantMemoryPlaceholderHelper place) noexcept; 
-};
-
-/// own placement new implementation 
-/** see https://en.cppreference.com/w/cpp/memory/new/operator_new */
-inline void* operator new(INSTANTMEMORY_SIZE_T, InstantMemoryPlaceholderHelper place) noexcept{
-    return place.ptr;
-}
-
+    /// own placement new implementation 
+    /** see https://en.cppreference.com/w/cpp/memory/new/operator_new */
+    inline void* operator new(INSTANTMEMORY_SIZE_T, InstantMemoryPlaceholderHelper place) noexcept{
+        return place.ptr;
+    }
 #endif
 
 
 //______________________________________________________________________________
 // Configurable error handling and interrupt safety
+
+/* Common configuration to be included only if available
+   (you can separate file and/or configure individually
+    or just skip that to stick with defaults) */
+#if defined(__has_include) && __has_include("InstantRTOS.Config.h")
+#   include "InstantRTOS.Config.h"
+#endif
 
 #ifndef InstantMemory_Panic
 #   ifdef InstantRTOS_Panic
@@ -253,12 +273,14 @@ inline void* operator new(INSTANTMEMORY_SIZE_T, InstantMemoryPlaceholderHelper p
 #endif
 
 #ifndef InstantMemory_EnterCritical
-#   ifdef InstantMemory_EnterCritical
+#   if defined(InstantRTOS_EnterCritical) && !defined(InstantMemory_SuppressEnterCritical)
 #       define InstantMemory_EnterCritical InstantRTOS_EnterCritical
 #       define InstantMemory_LeaveCritical InstantRTOS_LeaveCritical
+#       define InstantMemory_MutexObject InstantRTOS_MutexObject
 #   else
 #       define InstantMemory_EnterCritical
 #       define InstantMemory_LeaveCritical
+#       define InstantMemory_MutexObject
 #   endif
 #endif
 
@@ -315,6 +337,7 @@ public:
             SizeType s; ///<Internal usage (for alignment purposes)
         };
 #ifdef InstantMemory_BlockPoolCountInMetadata
+        /// TODO: do we need this?
         SizeType useCount;
 #endif
     };
@@ -477,9 +500,18 @@ public:
     ~LifetimeManager();
 
     ///Create corresponding item inside, or panic if already exists
-    /** Always returns valid reference (if returns at all)) */
+    /** Item is created by forwarding parameters,
+     * Once previous item is present issue panic.
+     * Always returns valid reference (if returns at all)) */
     template<class... Args>
     T& Emplace(Args&&... args);
+
+    ///Create corresponding item inside, or replace if already exists
+    /** Item is created by forwarding parameters,
+     * Any previous item are destructed before placing new one. 
+     * Always returns valid reference (if returns at all)) */
+    template<class... Args>
+    T& Force(Args&&... args);
 
     ///Access existing item or create the new one if not exists
     /** Use Emplace or operator-> if you do not need singleton
@@ -493,7 +525,7 @@ public:
     ///Destroy corresponding item if it existed, panic if not
     void DestroyOrPanic();
 
-    ///Check item exists
+    ///Check item exists (there is something stored here)
     explicit operator bool() const;
 
     ///Access to wrapped value
@@ -516,7 +548,7 @@ private:
 /** This is kind of "RAII like" scope for T from LifetimeManager<T> 
  * Especially useful with InstantCoroutine.h to make RAII like scopes,
  * but without introducing local variables crossing CoroutineYield()!
- * Use LifetimeManagerScope to nandle Emplace and Destroy automatically.
+ * Use LifetimeManagerScope to handle Emplace and Destroy automatically.
  * @code
  *      LifetimeManager<SomeClass> someLifetimeManager;
  *      ... //SomeClass does not exist here
@@ -747,10 +779,24 @@ T& LifetimeManager<T>::Emplace(Args&&... args){
         /* Create new item explicitly.
             Does what std::forward by exploiting reference collapsing */
         return *new( InstantMemoryPlaceholderHelper(placeInMemory) )
-                                    T( reinterpret_cast<Args&&>(args)... );
+                                    T( static_cast<Args&&>(args)... );
     }
     InstantMemory_Panic();
 }
+
+template<class T>
+template<class... Args>
+T& LifetimeManager<T>::Force(Args&&... args){
+    if( exists ){
+        // destroy old existing instance
+        reinterpret_cast<T*>(placeInMemory)->~T();
+    }
+    /* Create new item explicitly.
+        Does what std::forward by exploiting reference collapsing */
+    return *new( InstantMemoryPlaceholderHelper(placeInMemory) )
+                                T( static_cast<Args&&>(args)... );
+}
+
 
 template<class T>
 template<class... Args>
@@ -760,7 +806,7 @@ T& LifetimeManager<T>::Singleton(Args&&... args){
     }
     exists = true;
     return *new( InstantMemoryPlaceholderHelper(placeInMemory) )
-                                    T( reinterpret_cast<Args&&>(args)... );
+                                    T( static_cast<Args&&>(args)... );
 }
 
 

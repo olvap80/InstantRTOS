@@ -1,63 +1,73 @@
 /** @file InstantScheduler.h
-    @brief The simplest possible portable scheduler suitable for embedded 
-           platforms like Arduino (actually only standard C++ is required).
-           Hardware independent, clear algorithm, easy to integrate!
+ @brief The simplest possible portable scheduler suitable for embedded 
+        platforms like Arduino (actually only standard C++ is required).
+        Hardware independent, clear algorithm, easy to integrate!
 
-    See sample below for details.
-    @code
-    
-    @endcode
+See sample below for details.
+ @code
 
-    NOTE: you run that Scheduler manually, there can be as many schedulers as
-          you like and each scheduler instance can have own units and timing!
+ @endcode
 
-    Additional sample of scheduling with coroutines:
+NOTE: you run that Scheduler manually, there can be as many schedulers as
+      you like and each scheduler instance can have own units and timing!
 
-    On choosing time unit and precision please see 
-    https://forum.arduino.cc/t/how-fast-can-i-interrupt/25884
-    and https://forum.arduino.cc/t/high-precision-timing-feasibility/177907
-    and https://forum.arduino.cc/t/micros-vs-milis-accuracy-of-interrupt-measurements/288768
+Additional sample of scheduling with coroutines:
 
-    MIT License
+On choosing time unit and precision please see 
+https://forum.arduino.cc/t/how-fast-can-i-interrupt/25884
+and https://forum.arduino.cc/t/high-precision-timing-feasibility/177907
+and https://forum.arduino.cc/t/micros-vs-milis-accuracy-of-interrupt-measurements/288768
 
-    Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
 
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
+NOTE: InstantScheduler.h is configurable for interrupt (thread) safety.
+      It is always safe to use the same object from the same thread.
+      (different objects used from different threads will work as well).
+      It is safe to use the same object from different threads/interrupts
+      only if that interrupt (thread) safety is configured, see below
 
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+Portable and easy to use scheduler in standard C++11
+MIT License
+
+Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 #ifndef InstantScheduler_INCLUDED_H
 #define InstantScheduler_INCLUDED_H
 
-#include "InstantDelegate.h"
-#include "InstantIntrusiveList.h"
-
-/*
-    TODO: futures/promises? JS then?
-            as callbacks?
-*/
 
 //______________________________________________________________________________
 // Individual configuration (just leave default when works as expected))
 
+/* Common configuration to be included only if available
+   (you can separate file and/or configure individually
+    or just skip that to stick with defaults) */
+#if defined(__has_include) && __has_include("InstantRTOS.Config.h")
+#   include "InstantRTOS.Config.h"
+#endif
+
 /* Uncomment below to collect basic scheduler usage statistics
    (one can use that statistics to ensure schedule loop performs
-    according to expected timings)) */
+    according to expected timings, but remember: 
+    statistics is at some cost of execution time and binary size)) */
 #define InstantScheduler_StatisticsCollection
 // Uncomment below to allow floating average
 #define InstantScheduler_StatisticsAverageCount 1000 
@@ -76,15 +86,60 @@
    or event from threads of other RTOS running in parallel ))
    (just leave as is if interrupts/other RTOS are not used) */
 #ifndef InstantScheduler_EnterCritical
-#   ifdef InstantRTOS_EnterCritical
+#   if defined(InstantRTOS_EnterCritical) && !defined(InstantScheduler_SuppressEnterCritical)
 #       define InstantScheduler_EnterCritical InstantRTOS_EnterCritical
 #       define InstantScheduler_LeaveCritical InstantRTOS_LeaveCritical
+#       define InstantScheduler_MutexObject InstantRTOS_MutexObject
 #   else
 #       define InstantScheduler_EnterCritical
 #       define InstantScheduler_LeaveCritical
+#       define InstantScheduler_MutexObject
 #   endif
 #endif
 
+//______________________________________________________________________________
+// All dependencies are only internal inside InstantRTOS
+
+#include "InstantDelegate.h"
+#include "InstantThenable.h"
+#include "InstantIntrusiveList.h"
+
+/*
+    TODO: futures/promises? JS then?
+            as callbacks?
+
+    TODO: https://pages.github.com/
+    https://github.com/olvap80/InstantRTOS/settings/pages
+
+    а тоді https://search.google.com/search-console/welcome
+
+    https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll
+    https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll/about-github-pages-and-jekyll
+
+
+    https://jekyllrb.com/docs/posts/
+
+    also
+    https://kbroman.org/simple_site/pages/independent_site.html
+
+    AND
+    https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
+
+
+    ScheduleLater та ScheduleNow - ДЕКІЛЬКА МАЄ СМИСЛ!!!
+
+    ТАКОЖ TaskDefineSchedulable !!!!!!!!!
+    і чи воно взагалі має смисл?
+    походу так, бо тепер можна робити 
+    Schedule прямо з таска через TaskAwaitSchedule*** TaskAwaitListen***
+
+template<class TaskResult>
+class SchedulableTaskBase:
+    protected ActionNode
+    public TaskBase
+{
+
+*/
 
 //______________________________________________________________________________
 // The ActionNode - universal "schedulable thing"
@@ -103,7 +158,9 @@ class MulticastToActions;
  * REMEMBER: scheduled/subscribed ActionNode takes care to unschedule self from
  *           any previous Scheduler/MulticastToActions ... instance.
  *           (there is only one schedule/subscription at a time!) */
-class ActionNode: private IntrusiveList<ActionNode>::Node{
+class ActionNode:
+    private IntrusiveList<ActionNode>::Node // can be part of chain
+{
 public:
     //all the copying is banned (this ensures pointers are valid)
     constexpr ActionNode(const ActionNode&) = delete;
@@ -111,10 +168,10 @@ public:
 
 
     //__________________________________________________________________________
-    // Attaching actual callback/delegate
+    // Attaching actual callback/delegate (with chaining)
 
     /// Type of the callback being used by the scheduled items
-    using Callback = EventCallback; //same as Delegate< void() >;
+    using Callback = Thenable<void>::Callback; //same as Delegate< void() >;
 
 
     /// Empty (do nothing) callback (use Set to assign callback later)
@@ -157,7 +214,7 @@ public:
     /// Provide < (less) operation for Ticks within limited range
     /** All intervals within DeltaMax are "ordered" and comparable.
      *  Possible overflow is already taken into account.
-     * \returns true if operand1 goes before operand2
+     * @returns true if operand1 goes before operand2
      *          (crossing unsigned ) */
     static bool TicksIsLess(const Ticks& op1, const Ticks& op2);
 
@@ -171,7 +228,7 @@ public:
     /** Actually synonym to ScheduleAfter(targetScheduler, 1)
      * Current ExecuteAll will NOT see that scheduled item,
      * because it is "in the future" from current time! */
-    void ScheduleLater(Scheduler& targetScheduler);
+    ActionNode& ScheduleLater(Scheduler& targetScheduler);
 
     /// Schedule for execution "in same iteration"
     /** Actually synonym to ScheduleAfter(targetScheduler, 0)
@@ -186,7 +243,7 @@ public:
      *    to call ExecuteAll for those time critical
      *    stuff that has to be executed in time,
      *    between ExecuteOne of those less critical items */ 
-    void ScheduleNow(Scheduler& targetScheduler);
+    ActionNode& ScheduleNow(Scheduler& targetScheduler);
 
 
     ///Schedule for execution after all items of the same time
@@ -194,7 +251,7 @@ public:
      * Adds after all items with the same ticks in targetScheduler,
      * the ticksToWaitFirstTime is counted from current time of the target!
      * NOTE: remember tick units are "as in that scheduler"!*/
-    void ScheduleAfter(
+    ActionNode& ScheduleAfter(
         Scheduler& targetScheduler,
         Ticks ticksToWaitFirstTime,
         Ticks periodTicks = 0
@@ -203,7 +260,7 @@ public:
     ///Schedule for execution later
     /** Adds before all items with the same ticks,
      * NOTE: remember tick units are "as in that scheduler"! */
-    void ScheduleBefore(
+    ActionNode& ScheduleBefore(
         Scheduler& targetScheduler,
         Ticks ticksToWaitFirstTime,
         Ticks periodTicks = 0
@@ -231,14 +288,14 @@ public:
     /** Multiple ActionNode can be listening to the same MulticastToActions
      * simultaneously, and can be executed once that MulticastToActions
      * is called. Those, that were added with ListenOnce will be removed on call */
-    void ListenOnce(MulticastToActions& multicastToAction);
+    ActionNode& ListenOnce(MulticastToActions& multicastToAction);
 
     /// Listen to MulticastToActions calls (stay listening after call)
     /** Multiple ActionNode can be listening to the same MulticastToActions
      * simultaneously, and can be executed once that MulticastToActions
      * is called. Those, that were added with ListenSubscribe
      * stay listen as long as are not removed manually by Cancel */
-    void ListenSubscribe(MulticastToActions& multicastToAction);
+    ActionNode& ListenSubscribe(MulticastToActions& multicastToAction);
 
     /// Test ActionNode is listening to MulticastToActions instance
     /** Verify ActionNode is listening to MulticastToActions instance */
@@ -259,13 +316,6 @@ public:
      * you need to use Set(...) or Then(...) to keep track of the callback again */
     void ResetCallback();
 
-    /// Delegate what will call EventSlot and Reset it ("unsubscribe")
-    /** Use this API to create "single shot" subscriptions for this EventSlot,
-     * such delegate will call EventSlot and ResetCallback(), 
-     * so that EventSlot::Then() has to be called again
-     * NOTE: REMEMBER TO OVERWRITE CallAndResetCallback EXISTING SUBSCRIPTION
-     *       ON EventSlot Reset TO PREVENT "message from the past" */
-    Callback MakeUnsubscribingCallback();
 
 private:
     // Node must see ActionNode as derived from self
@@ -277,8 +327,7 @@ private:
     // MulticastToActions needs to run ActionNode instances
     friend class MulticastToActions;
 
-    /// Code to be called once schedule time comes (does nothing by default)
-    EventSlot eventSlot;
+    ThenableToResolve<void> thenableToResolve;
 
     ///Q: may be reversing methods will make scheduledWith unneeded? 
     //turn ActionNode::Cancel(); to Scheduler::Cancel(ActionNode?)
@@ -361,7 +410,7 @@ public:
     
 
     /// Obtain when next event is going to happen
-    /** \returns true if there is next time moment known
+    /** @returns true if there is next time moment known
      *           false if there is no scheduled moment at all */
     bool HasNextTicks(Ticks* writeTo) const;
 
@@ -474,16 +523,16 @@ private:
 // Implementing ActionNode
 
 inline ActionNode::ActionNode(const Callback& eventCallback)
-    : eventSlot(eventCallback) {}
+    : thenableToResolve(eventCallback) {}
 
 
 inline ActionNode& ActionNode::Set(const Callback& eventCallback){
-    eventSlot.Set(eventCallback);
+    thenableToResolve.Set(eventCallback);
     return *this;
 }
 
 inline ActionNode& ActionNode::Then(const Callback& eventCallback){
-    eventSlot.Then(eventCallback);
+    thenableToResolve.Then(eventCallback);
     return *this;
 }
 
@@ -496,16 +545,16 @@ inline bool ActionNode::TicksIsLess(const Ticks& op1, const Ticks& op2){
 }
 
 
-inline void ActionNode::ScheduleLater(Scheduler& targetScheduler){
-    ScheduleAfter(targetScheduler, 1);
+inline ActionNode& ActionNode::ScheduleLater(Scheduler& targetScheduler){
+    return ScheduleAfter(targetScheduler, 1);
 }
 
-inline void ActionNode::ScheduleNow(Scheduler& targetScheduler){
-    ScheduleAfter(targetScheduler, 0);
+inline ActionNode& ActionNode::ScheduleNow(Scheduler& targetScheduler){
+    return ScheduleAfter(targetScheduler, 0);
 }
 
 
-inline void ActionNode::ScheduleAfter(
+inline ActionNode& ActionNode::ScheduleAfter(
     Scheduler& targetScheduler,
     Ticks ticksToWaitFirstTime,
     Ticks periodTicks
@@ -521,9 +570,10 @@ inline void ActionNode::ScheduleAfter(
     scheduleAfterFindPlace();
 
     InstantScheduler_LeaveCritical
+    return *this;
 }
 
-inline void ActionNode::ScheduleBefore(
+inline ActionNode& ActionNode::ScheduleBefore(
     Scheduler& targetScheduler,
     Ticks ticksToWaitFirstTime,
     Ticks periodTicks
@@ -556,6 +606,7 @@ inline void ActionNode::ScheduleBefore(
     itr->InsertPrevChainElement(this);
 
     InstantScheduler_LeaveCritical
+    return *this;
 }
 
 
@@ -573,12 +624,14 @@ inline ActionNode::Ticks ActionNode::PeriodTicksAgain() const{
 }
 
 
-void ActionNode::ListenOnce(MulticastToActions& multicastToAction){
+ActionNode& ActionNode::ListenOnce(MulticastToActions& multicastToAction){
     listenTo(multicastToAction, true);
+    return *this;
 }
 
-void ActionNode::ListenSubscribe(MulticastToActions& multicastToAction){
+ActionNode& ActionNode::ListenSubscribe(MulticastToActions& multicastToAction){
     listenTo(multicastToAction, false);
+    return *this;
 }
 
 void ActionNode::listenTo(
@@ -624,13 +677,9 @@ inline void ActionNode::Cancel(){
 
 
 inline void ActionNode::ResetCallback(){
-    eventSlot.ResetCallback();
+    thenableToResolve.ResetCallback();
 }
 
-
-inline ActionNode::Callback ActionNode::MakeUnsubscribingCallback(){
-    return eventSlot.MakeUnsubscribingCallback();
-}
 
 
 inline void ActionNode::prepareForNewSchedule(
@@ -729,7 +778,7 @@ inline bool Scheduler::ExecuteOne(
     if( actionBeingExecutedNow ){
         /*  Note: periodic item can cancel self here
                     (then periodTicksAgain turns 0) */
-        actionBeingExecutedNow->eventSlot();
+        actionBeingExecutedNow->thenableToResolve();
 
         {
             InstantScheduler_EnterCritical
@@ -877,7 +926,7 @@ void MulticastToActions::operator()(){
         //Item is removed but iterator stays valid))
         action->RemoveFromChain();
         
-        action->eventSlot(); //Execute stuff (this can add action to somewhere)
+        action->thenableToResolve(); //Execute stuff (this can add action to somewhere)
 
         if(
                 // action does not want to be autoremoved!

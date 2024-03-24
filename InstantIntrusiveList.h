@@ -2,120 +2,137 @@
     @brief Zero overhead intrusive bidirectional (double linked) list (chain)
            no dependencies at all (does not depend even on standard headers)
 
-    Suitable for embedded platforms like Arduino, no dynamic memory usage at all
-    (minimalistic implementation to chain existing items into iterable list)
+Suitable for embedded platforms like Arduino, no dynamic memory usage at all
+(minimalistic implementation to chain existing items into iterable list)
 
-    Compatible with range based for.
+Compatible with range based for.
 
-    Example Usage (generate sequences):
-    @code
-        class MyTestItem: public IntrusiveList<MyTestItem>::Node{
-        public:
-            /// Constructor for testing purposes
-            MyTestItem(int value) : storedValue(value){}
+Example Usage (generate sequences):
+ @code
+    class MyTestItem: public IntrusiveList<MyTestItem>::Node{
+    public:
+        /// Constructor for testing purposes
+        MyTestItem(int value) : storedValue(value){}
 
-            /// Method for testing purposes
-            void Print(){
-                Serial.println(storedValue);
-            }
-        private:
-            int storedValue;
-        };
+        /// Method for testing purposes
+        void Print(){
+            Serial.println(storedValue);
+        }
+    private:
+        int storedValue;
+    };
 
-        void setup() {
-            Serial.begin(9600);
+    void setup() {
+        Serial.begin(9600);
+    }
+
+    void loop() {
+
+        Serial.println(F("\n------------- Iteration -------------"));
+
+        // put your main code here, to run repeatedly:
+        IntrusiveList<MyTestItem> il;
+
+        MyTestItem ti1(11);
+        MyTestItem ti2(22);
+        MyTestItem ti3(33);
+
+        il.InsertAtFront(&ti2);
+        il.InsertAtFront(&ti1);
+        il.InsertAtBack(&ti3);
+        for(auto& item : il){
+            item.Print();
+        }
+        Serial.println(F("----"));
+
+        MyTestItem ti4(444);
+        ti2.InsertPrevChainElement(&ti4);
+        for(auto& item : il){
+            item.Print();
+        }
+        Serial.println(F("----"));
+
+        ti2.InsertNextChainElement(&ti4);
+        for(auto& item : il){
+            item.Print();
+        }
+        Serial.println(F("----"));
+
+        ti4.RemoveFromChain();
+        for(auto& item : il){
+            item.Print();
+        }
+        Serial.println(F("----"));
+
+        il.RemoveAtFront();
+        for(auto& item : il){
+            item.Print();
+        }
+        Serial.println(F("----"));
+
+        il.RemoveAtEnd();
+        for(auto& item : il){
+            item.Print();
+        }
+        Serial.println(F("----"));
+
+        ti2.RemoveFromChain();
+        for(auto& item : il){
+            item.Print();
         }
 
-        void loop() {
+        delay(14200);
+    }
+ @endcode
 
-            Serial.println(F("\n------------- Iteration -------------"));
+NOTE: chains and intrusive lists are not threadsafe/interrupt safe
+      different chains/lists can be used from different threads without problems.
 
-            // put your main code here, to run repeatedly:
-            IntrusiveList<MyTestItem> il;
+MIT License
 
-            MyTestItem ti1(11);
-            MyTestItem ti2(22);
-            MyTestItem ti3(33);
+Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantArduino
 
-            il.InsertAtFront(&ti2);
-            il.InsertAtFront(&ti1);
-            il.InsertAtBack(&ti3);
-            for(auto& item : il){
-                item.Print();
-            }
-            Serial.println(F("----"));
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-            MyTestItem ti4(444);
-            ti2.InsertPrevChainElement(&ti4);
-            for(auto& item : il){
-                item.Print();
-            }
-            Serial.println(F("----"));
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-            ti2.InsertNextChainElement(&ti4);
-            for(auto& item : il){
-                item.Print();
-            }
-            Serial.println(F("----"));
-
-            ti4.RemoveFromChain();
-            for(auto& item : il){
-                item.Print();
-            }
-            Serial.println(F("----"));
-
-            il.RemoveAtFront();
-            for(auto& item : il){
-                item.Print();
-            }
-            Serial.println(F("----"));
-
-            il.RemoveAtEnd();
-            for(auto& item : il){
-                item.Print();
-            }
-            Serial.println(F("----"));
-
-            ti2.RemoveFromChain();
-            for(auto& item : il){
-                item.Print();
-            }
-
-            delay(14200);
-        }
-    @endcode
-
-    MIT License
-
-    Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantArduino
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 #ifndef InstantIntrusiveList_INCLUDED_H
 #define InstantIntrusiveList_INCLUDED_H
+
+//______________________________________________________________________________
+// Configurable error handling
+
+/* Common configuration to be included only if available
+   (you can separate file and/or configure individually
+    or just skip that to stick with defaults) */
+#if defined(__has_include) && __has_include("InstantRTOS.Config.h")
+#   include "InstantRTOS.Config.h"
+#endif
 
 #ifndef InstantIntrusiveListPanic
     ///Special case to handle coroutine in unexpected state
     /** NOTE: coroutine used after completion also falls here */
 #   define InstantIntrusiveListPanic() /* TODO: your custom action here! */ for(;;){}
 #endif
+
+
+//______________________________________________________________________________
+// Public API
 
 /// Element for building circular chain of items
 /** Single element (item/node/link) of a circular doubly linked list
@@ -240,13 +257,13 @@ public:
     /// Removes a node from the start of the list (if any)
     /** First Node is removed from the chain of elements,
      *  but not deleted (IntrusiveList does not manage lifetime).
-     *  \returns pointer to the removed node, or nullptr if nothing to remove */
+     *  @returns pointer to the removed node, or nullptr if nothing to remove */
     ItemType* RemoveAtFront();
 
     /// Removes a node from the end of the list (if any)
     /** The last Node is removed from the chain of elements,
      *  but not deleted (IntrusiveList does not manage lifetime).
-     *  \returns pointer the to removed node, or nullptr if nothing to remove */
+     *  @returns pointer the to removed node, or nullptr if nothing to remove */
     ItemType* RemoveAtEnd();
 
 

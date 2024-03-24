@@ -6,234 +6,266 @@
 
     (c) and license see https://github.com/olvap80/InstantRTOS
 
-    Initially was created as a low-memory, easy to copy, fast-to-invoke
-    lightweight delegates/lambdas for Arduino and similar platforms,
-    Can be also used as alternative delegate on Windows and Linux.
-    Zero dependencies, by default does not depend even on standard headers!
-    Cheap and fast replacement of std::function for Arduino and other platforms.
-    Any "callable stuff" can be handled with InstantDelegate library :)
-    Suitable for embedded real time applications with deterministic behavior.
+Initially was created as a low-memory, easy to copy, fast-to-invoke
+lightweight delegates/lambdas for Arduino and similar platforms,
+Can be also used as alternative delegate on Windows and Linux.
+Zero dependencies, by default does not depend even on standard headers!
+Cheap and fast replacement of std::function for Arduino and other platforms.
+Any "callable stuff" can be handled with InstantDelegate library :)
+Suitable for embedded real time applications with deterministic behavior,
+there is a guarantee sizeof(Delegate) <= 2*sizeof(void), and this guarantee
+works even for (object+member function) pair, see sample below. 
 
-    You can just copy this file to your project,
-    it dos not depend on other components of InstantRTOS.
-    Single header, no build steps required!
+You can just copy this file to your project,
+it dos not depend on other components of InstantRTOS.
+Single header, no build steps required!
 
-    Short sample:
-    @code
-        //shorthand to not repeat the same signature every time
-        using MyCallback = Delegate<int(int)>;
+Short sample:
+ @code
+    //shorthand to not repeat the same signature every time
+    using MyCallback = Delegate<int(int)>;
 
-        //using callback by some custom API
-        void CustomAPI(const MyCallback& callbackNeeded){
-            auto myValue = callbackNeeded(some_int_argument)
+    //using callback by some custom API
+    void CustomAPI(const MyCallback& callbackNeeded){
+        auto myValue = callbackNeeded(some_int_argument)
+        ...
+    }
+    ...
+
+    //various ways for creating the callback from lambdas, objects, methods
+    
+    //one can make callback directly from C++ lambda
+    CustomAPI( MyCallback([](int val){ return val + 42;}) );
+
+    //and from "simple" function (implicit conversion is supported)
+    CustomAPI( ordinary_function_with_compatible_signature );
+    
+    //also one can create Delegate for calling method of some object 
+    SomeClass targetObject{42};
+    CustomAPI( MyCallback::From(targetObject).Bind<&SomeClass::some_method>() );
+
+    //and callable things having compatible operator() can also be referenced
+    class SomeFunctor{
+    public:
+        ...
+        int operator()(int val) {
             ...
         }
-        ...
+    };
+    ...
+    SomeFunctor customCallable;
+    CustomAPI(customCallable);
+ @endcode
 
-        //various ways for creating the callback from code
+See additional usages covering other use cases in expanded sample below,
+including referencing function like objects and method pointers for c++.
+
+All the Delegate instances with the same signature are "compatible" with each
+other, and can be copied/assigned, passed as parameters, regardless 
+of what kind of "callable" is actually referenced.
+
+NOTE: The Delegate instance created for C++ lambda
+        will not copy that C++ lambda!
+        It is responsibility of the developer to ensure that Delegate
+        is not called after original callable/lambda is destructed
+
+
+Additional sample, serves as a demo to cover more possible usages
+as a fast and compact C++ delegates for embedded platforms, like Arduino:
+@code
+    ///Sample API for receiving "callable" Delegate as parameter
+    void test(const Delegate<int(int)>& delegateToCall){
+        Serial.println(F("ENTER test API being called with Delegate["));
         
-        //one can make callback directly from C++ lambda
-        CustomAPI( MyCallback([](int val){ return val + 42;}) );
-
-        //and from "simple" function (implicit conversion is supported)
-        CustomAPI( ordinary_function_with_compatible_signature );
+        int res = delegateToCall(10);
         
-        //also one can create Delegate for calling method of some object 
-        SomeClass targetObject{42};
-        CustomAPI( MyCallback::From(targetObject).Bind<&SomeClass::some_method>() );
+        Serial.print(F("]LEAVE test API being called with Delegate"));
+        Serial.println(res);
+    }
 
-        //and callable things having compatible operator() can also be referenced
-        class SomeFunctor{
-        public:
-            ...
-            int operator()(int val) {
-                ...
-            }
+    ///Sample "unbound" function to be called via Delegate
+    int function_to_pass_to_Delegate(int val){
+        Serial.println(F("function_to_pass_to_Delegate called"));
+        return val + 2;
+    }
+
+    ///Sample class (to demonstrate functor and method calls)
+    class TestClass{
+    public:
+        TestClass(int addToVal): addTo(addToVal) {}
+
+        ///Demo functor to be tied with delegate
+        int operator()(int val) const {
+            Serial.println(F("functor operator() called"));
+            return val + addTo;
+        }
+
+        ///Demo method to be tied with delegate (object, method pair)
+        int test_method(int val) const {
+            Serial.println(F("method_to_pass_to_Delegate called"));
+            return val + addTo;
+        }
+
+        ///Demo method to demonstrate usage from free function
+        int valueGet() const{
+            return addTo;
+        }
+
+    private:
+        int addTo;
+    };
+
+    //one can also create Delegate by binging objects to free functions 
+    //(this may surprize you, but the word class is needed below,
+    // to make such functions statically bindable at compile time)
+    int function_to_bind_receivingRef(const class TestClass& t, int val){
+        Serial.println(F("function_to_bind_receivingRef"));
+        return t.valueGet() + 100 + val;
+    }
+    int function_to_bind_receivingPtr(class TestClass* t, int val){
+        Serial.println(F("function_to_bind_receivingPtr"));
+        return t->valueGet() + 1000 + val;
+    }
+
+
+    ///Setup once execution environment for Arduino board
+    void setup() {
+        Serial.begin(9600);
+    }
+
+    ///Arduino (event) loop
+    void loop() {
+        Serial.println(F("\n------------- Iteration -------------"));
+
+        //demo of "something callable" being passed to test as Delegate
+        TestClass demoCallable{-2};
+        test(demoCallable);
+
+        //demo variable to be captured by lambda
+        int captured = 1;
+        //C++ "long lasting" lambda to be referenced by the Delegate
+        auto lambdaAsVariable = [&](int val){
+            Serial.println(F("lambdaAsVariable"));
+            return val + captured;
         };
-        ...
-        SomeFunctor customCallable;
-        CustomAPI(customCallable);
-    @endcode
+        //one can easy call any functor/callable via delegate
+        //assuming callable functor lives as long as delegate is called
+        test(lambdaAsVariable);
 
-    See additional usages covering other use cases in expanded sample below.
+        //Function pointer can be called (implicit conversion, direct constructor is called)
+        test(function_to_pass_to_Delegate);
 
-    All the Delegate instances with the same signature are "compatible" with each
-    other, and can be copied/assigned, passed as parameters, regardless 
-    of what kind of "callable" is actually referenced.
+        //inline "non capturing" lambda can be explicitly forced to be Delegate
+        test(
+            Delegate<int(int)>([](int val){
+                Serial.println(F("inlined lambda"));
+                return val + 3;
+            })
+        );
 
-    NOTE: The Delegate instance created for C++ lambda
-          will not copy that C++ lambda!
-          It is responsibility of the developer to ensure that Delegate
-          is not called after original callable/lambda is destructed
+        captured = 4;
+        //call with inlined lambda is also possible to force with Unstorable
+        //(we can do this because we do not save that temporary!)
+        test(Delegate<int(int)>::Unstorable([&](int val){
+            Serial.println(F("Temporary inlined_lambda (to be called by test, but not stored)"));
+            return val + captured;
+        }));
 
+        //method pointer for existing object can be created
+        const TestClass demoCallable5{5};
+        //Note: direct call without delegate is demoCallable5.test_method(42);
+        test(
+            Delegate<int(int)>::From(demoCallable5).Bind<&TestClass::test_method>()
+        );
+        //Ensure method pointer can be created with short syntax
+        TestClass demoCallable6{6};
+        test(
+            Delegate<int(int)>::From(&demoCallable6).Bind<&TestClass::test_method>()
+        );
 
-    Additional sample, serves as a demo to cover more possible usages
-    as a fast and compact C++ delegates for embedded platforms, like Arduino:
-    @code
-        ///Sample API for receiving "callable" Delegate as parameter
-        void test(const Delegate<int(int)>& delegateToCall){
-            Serial.println(F("ENTER test API being called with Delegate["));
-            
-            int res = delegateToCall(10);
-            
-            Serial.print(F("]LEAVE test API being called with Delegate"));
-            Serial.println(res);
-        }
+        //Ensure method pointer can be created from reference
+        TestClass demoCallable7{7};
+        test(
+            Delegate<int(int)>::From(demoCallable7).Bind<&function_to_bind_receivingRef>()
+        );
+        //Ensure method pointer can be created with short syntax
+        TestClass demoCallable8{8};
+        test(
+            Delegate<int(int)>::From(&demoCallable8).Bind<&function_to_bind_receivingPtr>()
+        );
 
-        ///Sample "unbound" function to be called via Delegate
-        int function_to_pass_to_Delegate(int val){
-            Serial.println(F("function_to_pass_to_Delegate called"));
-            return val + 2;
-        }
+        delay(4200);
+    }
 
-        ///Sample class (to demonstrate functor and method calls)
-        class TestClass{
-        public:
-            TestClass(int addToVal): addTo(addToVal) {}
+@endcode
 
-            ///Demo functor to be tied with delegate
-            int operator()(int val) const {
-                Serial.println(F("functor operator() called"));
-                return val + addTo;
-            }
+The Delegate class acts as the minimal "closure" for referring to
+"callable" items (lambda, functor or instance method) and can be treated
+as a "reference" to some "callable thing" existing "somewhere else".
+Here word "referring" means original content is not copied into that Delegate
+thus instance of the Delegate class acts as a "callable reference"
+implemented by wrapping (object_pointer, function_pointer) pair.
 
-            ///Demo method to be tied with delegate (object, method pair)
-            int test_method(int val) const {
-                Serial.println(F("method_to_pass_to_Delegate called"));
-                return val + addTo;
-            }
+The closest thing is proposed std::function_ref form C++26, 
+that can be treated as a type-erased callable reference
+but Delegate from InstantDelegate.h is also able to handle method pointers,
+and uses only two words to hold minimal closure!
+Generated code for trampolines contains called functions embedded
+Or is produces proper tail calls https://godbolt.org/z/dW6eMdWb6
+ @code
+    Delegate<int (int)>::MakeCallerForFunctor<loop()::$_1>::apply(Delegate<int (int)> const*, int): # @"Delegate<int (int)>::MakeCallerForFunctor<loop()::$_1>::apply(Delegate<int (int)> const*, int)"
+        movl    %esi, %eax
+        movq    8(%rdi), %rcx
+        movq    (%rcx), %rcx
+        addl    (%rcx), %eax
+        retq
+    Delegate<int (int)>::MakeCallerForConstMethod<TestClass const, &(TestClass::test_method(int) const)>::apply(Delegate<int (int)> const*, int): # @Delegate<int (int)>::MakeCallerForConstMethod<TestClass const, &(TestClass::test_method(int) const)>::apply(Delegate<int (int)> const*, int)
+        movq    8(%rdi), %rdi
+        jmp     TestClass::test_method(int) const   # TAILCALL
+    Delegate<int (int)>::MakeCallerForConstMethod<TestClass, &(TestClass::test_method(int) const)>::apply(Delegate<int (int)> const*, int): # @Delegate<int (int)>::MakeCallerForConstMethod<TestClass, &(TestClass::test_method(int) const)>::apply(Delegate<int (int)> const*, int)
+        movq    8(%rdi), %rdi
+        jmp     TestClass::test_method(int) const   # TAILCALL
+ @endcode
+See also https://godbolt.org/z/1ddGKs3PY for major compilers
 
-            ///Demo method to demonstrate usage from free function
-            int valueGet() const{
-                return addTo;
-            }
+NOTE: the same Delegate instance shall not be modified from different 
+      threads simultaneously (or modified simultaneously while being called)
+      also interrupt shall not modify Delegate while it is being called.
+      Different Delegate instances can be used independently 
+      from different threads without problems.
 
-        private:
-            int addTo;
-        };
+Fast delegate system for functions, functors and member function pointers
+MIT License
 
-        //one can also create Delegate by binging objects to free functions 
-        //(this may surprize you, but the word class is needed below,
-        // to make such functions statically bindable at compile time)
-        int function_to_bind_receivingRef(const class TestClass& t, int val){
-            Serial.println(F("function_to_bind_receivingRef"));
-            return t.valueGet() + 100 + val;
-        }
-        int function_to_bind_receivingPtr(class TestClass* t, int val){
-            Serial.println(F("function_to_bind_receivingPtr"));
-            return t->valueGet() + 1000 + val;
-        }
+Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
 
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-        ///Setup once execution environment for Arduino board
-        void setup() {
-            Serial.begin(9600);
-        }
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-        ///Arduino (event) loop
-        void loop() {
-            Serial.println(F("\n------------- Iteration -------------"));
-
-            //demo of "something callable" being passed to test as Delegate
-            TestClass demoCallable{-2};
-            test(demoCallable);
-
-            //demo variable to be captured by lambda
-            int captured = 1;
-            //C++ "long lasting" lambda to be referenced by the Delegate
-            auto lambdaAsVariable = [&](int val){
-                Serial.println(F("lambdaAsVariable"));
-                return val + captured;
-            };
-            //one can easy call any functor/callable via delegate
-            //assuming callable functor lives as long as delegate is called
-            test(lambdaAsVariable);
-
-            //Function pointer can be called (implicit conversion, direct constructor is called)
-            test(function_to_pass_to_Delegate);
-
-            //inline "non capturing" lambda can be explicitly forced to be Delegate
-            test(
-                Delegate<int(int)>([](int val){
-                    Serial.println(F("inlined lambda"));
-                    return val + 3;
-                })
-            );
-
-            captured = 4;
-            //call with inlined lambda is also possible to force with Unstorable
-            //(we can do this because we do not save that temporary!)
-            test(Delegate<int(int)>::Unstorable([&](int val){
-                Serial.println(F("Temporary inlined_lambda (to be called by test, but not stored)"));
-                return val + captured;
-            }));
-
-            //method pointer for existing object can be created
-            const TestClass demoCallable5{5};
-            //Note: direct call without delegate is demoCallable5.test_method(42);
-            test(
-                Delegate<int(int)>::From(demoCallable5).Bind<&TestClass::test_method>()
-            );
-            //Ensure method pointer can be created with short syntax
-            TestClass demoCallable6{6};
-            test(
-                Delegate<int(int)>::From(&demoCallable6).Bind<&TestClass::test_method>()
-            );
-
-            //Ensure method pointer can be created from reference
-            TestClass demoCallable7{7};
-            test(
-                Delegate<int(int)>::From(demoCallable7).Bind<&function_to_bind_receivingRef>()
-            );
-            //Ensure method pointer can be created with short syntax
-            TestClass demoCallable8{8};
-            test(
-                Delegate<int(int)>::From(&demoCallable8).Bind<&function_to_bind_receivingPtr>()
-            );
-
-            delay(4200);
-        }
-
-    @endcode
-
-    The Delegate class acts as the minimal "closure" for referring to
-    "callable" items (lambda, functor or instance method) and can be treated
-    as a "reference" to some "callable thing" existing "somewhere else".
-    Here word "referring" means original content is not copied into that Delegate
-    thus instance of the Delegate class acts as a "callable reference"
-    implemented by wrapping (object_pointer, function_pointer) pair.
-    
-    
-    Fast delegate system for functions, functors and member function pointers
-    MIT License
-
-    Copyright (c) 2023 Pavlo M, see https://github.com/olvap80/InstantRTOS
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 */
 
 #ifndef InstantDelegate_INCLUDED_H
 #define InstantDelegate_INCLUDED_H
 
-///Delegate (callable reference) to "callable thing" without ownership
-template<class CallableSignature>
-class Delegate;
+//______________________________________________________________________________
+// The delegate for all the "callable things" (simplest lambda of fixed size)
+
+
+template<class CallableSignature> class Delegate;
 
 
 ///Delegate (callable reference) to "callable thing" without ownership
@@ -245,11 +277,21 @@ class Delegate;
 template<class Res, class... Args>
 class Delegate<Res(Args...)>{
 public:
+    //__________________________________________________________________________
+    // Delegate instance creation
+
     ///It is not allowed to create empty Delegate (lambda references)
     /** See various ways to create Delegate below!
      *  When needed by design one can use explicit initialization
      *  to handle the case of calling the "unassigned" reference */
     constexpr Delegate() = delete;
+
+    //allow all the copying and assignments
+    Delegate(const Delegate& other): state(other.state) {}
+    Delegate(Delegate& other): state(other.state) {}
+    Delegate(Delegate&&) = default;
+    Delegate& operator =(const Delegate&) = default;
+    Delegate& operator =(Delegate&&) = default;
 
 
     ///Issue/call Delegate with corresponding arguments
@@ -274,6 +316,15 @@ public:
      * Here you can pass to simpleCaseCallee any variable */
     constexpr Delegate(SimpleCaseCallee* simpleCaseCallee);
 
+    //Convenience implicit conversion for lambda converting to function pointer  
+    template<class SomeLambda>
+    constexpr Delegate(
+        const SomeLambda& lambda,
+        decltype(static_cast<SimpleCaseCallee*>(*static_cast<SomeLambda*>(nullptr)) )* = nullptr
+    ) : Delegate(static_cast<SimpleCaseCallee*>(lambda)) {}
+
+    //__________________________________________________________________________
+    // Creating delegates from instances with binding to methods 
 
     ///Helper class to create Delegate instances, see From...Bind API below
     /** For using in a chained call, see sample for From...Bind above and below.
@@ -288,7 +339,8 @@ public:
         Delegate<int(int)>::From(objectName).Bind<&ClassName::method>()
         Delegate<int(int)>::From(objectName).Bind<&function_to_bind_receivingRef>()
         Delegate<int(int)>::From(objectName).Bind<&function_to_bind_receivingPtr>()
-    @endcode 
+    @endcode
+    Be aware of referenced object life time!
     REMEMBER: OBJECT SHALL CONTINUE TO EXIST AS LONG
               AS THERE ARE CORRESPONDING DELEGATES REFERRING TO IT!!! */
     template<class C>
@@ -303,6 +355,7 @@ public:
         Delegate<int(int)>::From(&objectName).Bind<&function_to_bind_receivingRef>()
         Delegate<int(int)>::From(&objectName).Bind<&function_to_bind_receivingPtr>()
     @endcode
+    Be aware of referenced object life time!
     REMEMBER: OBJECT SHALL CONTINUE TO EXIST AS LONG
               AS THERE ARE CORRESPONDING DELEGATES REFERRING TO IT!!! */
     template<class C>
@@ -310,15 +363,11 @@ public:
     Delegate::template BoundDelegateBuilder<C> From(C* objectPointer);
 
 
+    //__________________________________________________________________________
+    // Comparisons and testing
+
     ///Test delegate points to something (is "not null")
     constexpr explicit operator bool() const;
-
-
-    ///Force delegate reference from temporary functor (be aware see below)
-    /** NOTE: this is not for storage, only as parameters like [&](...){ lambda!
-     *        Be aware: do not store permanently after API exits */
-    template<class Functor>
-    static constexpr Delegate Unstorable(Functor&& functor);
 
 
     ///Check this instance is "less" then other
@@ -331,51 +380,71 @@ public:
     constexpr bool operator !=(const Delegate& other) const;
 
 
-    //allow all the copying and assignments
-    constexpr Delegate(const Delegate&) = default;
-    constexpr Delegate(Delegate&&) = default;
-    Delegate& operator =(const Delegate&) = default;
-    Delegate& operator =(Delegate&&) = default;
+    //__________________________________________________________________________
+    // Other stuff
+
+    ///Force delegate reference from temporary functor (be aware, see below)
+    /** NOTE: this is NOT FOR STORAGE, only as parameters like [&](...){ lambda!
+     *        Be aware: do not store permanently after API exits */
+    template<class Functor>
+    static constexpr Delegate Unstorable(Functor&& functor);
 
 
 protected:
 
     ///Signature of the caller is the same for all instances with the same signature
-    using InternalCallerType = Res(const Delegate* self, Args...);
+    using RawCallerType = Res(const Delegate* self, Args...);
 
-    ///All callers have the same signature, regardless of what is called
-    /** the operator(...) invokes correspondingCaller uniformly */
-    mutable InternalCallerType* correspondingCaller = nullptr;
+    /// State holds all information to invoke (and is workaround for some compilers)
+    struct State{
+        constexpr State() = default;
+        constexpr State(RawCallerType* caller): correspondingCaller(caller) {}
+        
+        constexpr State(RawCallerType* caller, void* theCalleeAsObjectToUse)
+            : correspondingCaller(caller), theCalleeAsObject(theCalleeAsObjectToUse) {}
+        constexpr State(RawCallerType* caller, const void* theCalleeAsConstObjectToUse)
+            : correspondingCaller(caller), theCalleeAsConstObject(theCalleeAsConstObjectToUse) {}
+        constexpr State(RawCallerType* caller, SimpleCaseCallee* simpleCaseCalleeToUse)
+            : correspondingCaller(caller), simpleCaseCallee(simpleCaseCalleeToUse) {}
+        State(RawCallerType* caller, unsigned untrackedEventsCountToUse)
+            : correspondingCaller(caller), untrackedEventsCount(untrackedEventsCountToUse) {}
 
-    //union allows us to follow absolute minimalism
-    union{
-        ///Case of Functor reference - points to some object
-        /** (turns to "this" for the method being called) */
-        void* theCalleeAsObject;
-        ///Case of Functor reference - points to some const object
-        /** (turns to "this" for the method being called) */
-        const void* theCalleeAsConstObject;
+        ///All callers have the same signature, regardless of what is called
+        /** the operator(...) invokes correspondingCaller uniformly */
+        mutable RawCallerType* correspondingCaller = nullptr;
+        
+        //union allows us to follow absolute minimalism
+        union{
+            ///Case of Functor reference - points to some object
+            /** (turns to "this" for the method being called) */
+            void* theCalleeAsObject;
+            ///Case of Functor reference - points to some const object
+            /** (turns to "this" for the method being called) */
+            const void* theCalleeAsConstObject;
 
-        ///Case of "simple function" to be called
-        /** Make Delegate "universal", so that not only functor objects,
-         * but also "simple" functions can be attached! */
-        SimpleCaseCallee* simpleCaseCallee;
+            ///Case of "simple function" to be called
+            /** Make Delegate "universal", so that not only functor objects,
+             * but also "simple" functions can be attached! */
+            SimpleCaseCallee* simpleCaseCallee;
 
-        /// Counter for derived EventSlot (save space))
-        mutable unsigned untrackedEventsCount;
-    };
+            /// Counter for derived Thenable (to save space!))
+            mutable unsigned untrackedEventsCount;
+        };
+    } state;
+
+    static_assert(
+        sizeof(State) <= 2*sizeof(void*),
+        "Warranty of two words shall not be broken"
+    );
 
     ///Internal constructor to tie with actual caller and object
-    constexpr Delegate(InternalCallerType* caller);
+    constexpr Delegate(RawCallerType* caller);
 
 private:
-    // allow EventSlot to construct with custom InternalCallerType 
-    friend class EventSlot;
-
     ///Internal constructor to tie with actual caller and object
-    constexpr Delegate(InternalCallerType* caller, void* theCalleeAsObjectToUse);
+    constexpr Delegate(RawCallerType* caller, void* theCalleeAsObjectToUse);
     ///Internal constructor to tie with actual caller and const object
-    constexpr Delegate(InternalCallerType* caller, const void* theCalleeAsObjectToUse);
+    constexpr Delegate(RawCallerType* caller, const void* theCalleeAsObjectToUse);
 
     ///Handle the case when item to be called is simple function
     constexpr static Res callSimpleCase(const Delegate* self, Args... args);
@@ -423,120 +492,8 @@ private:
 };
 
 
-///Shortcut for the delegate without parameters (event)
-using EventCallback = Delegate<void()>;
-
-/// Callable Event that remembers the fact of calls before callback is attached
-/** It is possible to call EventSlot before callback is attached,
- * call counts is accumulated and can be obtained via UntrackedEventsCount(),
- * Then(...) or Set(...) API can be used to tie with arrived calls */
-class EventSlot: private EventCallback{
-public:
-    // cannot copy such event (as there is no "state sharing" for it!)
-    EventSlot(const EventSlot& other) = delete;
-    EventSlot& operator=(const EventSlot& other) = delete;
-
-
-    /// Setup initial EventSlot to work 
-    EventSlot() : EventCallback(callFutureBeforeThen) {
-        untrackedEventsCount = 0;
-    }
-
-    /// Setup already attached event
-    EventSlot(const EventCallback& eventCallback)
-        : EventCallback(eventCallback) {}
-
-
-    /* Allow calling event (and make it functor)
-       Prefer direct call of that event (the fastest way to work),
-       one can wrap reference to EventSlot in Delegate (EventCallback),
-       but remember EventSlot shall live as long as there are references */
-    using EventCallback::operator();
-
-
-    /// Setup new callback to execute on (and after) operator() call
-    /** Callback will execute immediately if EventSlot was previously called,
-     *  and only one time even if there were multiple previous calls.
-     *  After that such callback will execute once operator()
-     * NOTE: there is no way to return more events for chaining */
-    void Then(const EventCallback& eventCallback){
-        auto untrackedEventsCountPrev = 0;
-        if( correspondingCaller == callFutureBeforeThen ){
-            //we were still before assignment
-            untrackedEventsCountPrev = untrackedEventsCount;
-        }
-        EventCallback::operator=(eventCallback);
-        if( untrackedEventsCountPrev ){
-            // call the operator one time as the sign there were other calls
-            operator()();
-        }
-    }
-
-    /// Setup new callback to execute only on operator() call
-    /** Callback will execute only once operator() called,
-     *  precious calls on operator() have no effect
-     * NOTE: there is no way to return more events for chaining */
-    void Set(const EventCallback& eventCallback){
-        EventCallback::operator=(eventCallback);
-    }
-
-    /// Obtain number of event that did not invoke eventCallback
-    /** Can provide nonzero value only before Then(...) or Set(...),
-     * or after ResetCallback() is called.
-     * \returns number on times operator() without callback,
-     *          always 0 when callback was set */
-    unsigned UntrackedEventsCount() const {
-        if( correspondingCaller == callFutureBeforeThen ){
-            return untrackedEventsCount;
-        }
-        return 0;
-    }
-
-
-    /// Reset to initial state (will silently count again)
-    void ResetCallback(){
-        correspondingCaller = callFutureBeforeThen;
-        untrackedEventsCount = 0;
-    }
-
-
-    /// EventCallback (Delegate) what will call EventSlot and ResetCallback it
-    /** Use this API to create "single shot" subscriptions for this EventSlot,
-     * such delegate will call EventSlot and ResetCallback(), 
-     * so that EventSlot::Then(...) has to be set again
-     * NOTE: REMEMBER TO OVERWRITE UntrackedEventsCount EXISTING SUBSCRIPTION
-     *       ON EventSlot Reset TO PREVENT "message from the past" */
-    EventCallback MakeUnsubscribingCallback(){
-        return EventCallback(unsubscribeOnCall, this);
-    }
-
-
-private:
-
-    ///Handle the case when item to be called is simple function
-    static void callFutureBeforeThen(const EventCallback* self){
-        ++static_cast<const EventSlot*>(self)->untrackedEventsCount;
-    }
-
-    static void unsubscribeOnCall(const EventCallback* self){
-        auto target = static_cast<EventSlot*>(self->theCalleeAsObject);
-        // call the EventSlot instance
-        (*target)();
-        // reset 
-        target->ResetCallback();
-
-        // this caller shall not issue target any more ()
-        self->correspondingCaller = callFutureBeforeThen;
-        self->untrackedEventsCount = 0; //to make optimizer happy))
-    }
-};
-
-static_assert(
-    sizeof(EventSlot) == sizeof(EventCallback),
-    "There is a warranty EventSlot costs as corresponding delegate"
-);
-
-
+//______________________________________________________________________________
+// BoundDelegateBuilder - way to create simple closures (lambdas)
 
 template<class Res, class... Args>
 template<class C>
@@ -738,7 +695,7 @@ template<class Functor>
 struct Delegate<Res(Args...)>::MakeCallerForFunctor{
     ///Extract C++ object from Delegate and forward arguments
     static constexpr Res apply(const Delegate* self, Args... args){
-        return (*static_cast<Functor*>(self->theCalleeAsObject))( static_cast<Args&&>(args)... );
+        return (*static_cast<Functor*>(self->state.theCalleeAsObject))( static_cast<Args&&>(args)... );
     }
 };
 
@@ -746,7 +703,7 @@ template<class Res, class... Args>
 template<class C, Res (C::*methodValueAsTemplateParameter)(Args...)>
 struct Delegate<Res(Args...)>::MakeCallerForMethod{
     static constexpr Res apply(const Delegate* self, Args... args){
-        return (static_cast<C*>(self->theCalleeAsObject)->*methodValueAsTemplateParameter)
+        return (static_cast<C*>(self->state.theCalleeAsObject)->*methodValueAsTemplateParameter)
                     (static_cast<Args&&>(args)...);
     }
 };
@@ -754,7 +711,7 @@ template<class Res, class... Args>
 template<class C, Res (C::*methodValueAsTemplateParameter)(Args...) const>
 struct Delegate<Res(Args...)>::MakeCallerForConstMethod{
     static constexpr Res apply(const Delegate* self, Args... args){
-        return (static_cast<const C*>(self->theCalleeAsConstObject)->*methodValueAsTemplateParameter)
+        return (static_cast<const C*>(self->state.theCalleeAsConstObject)->*methodValueAsTemplateParameter)
                     (static_cast<Args&&>(args)...);
     }
 };
@@ -764,7 +721,7 @@ template<class C, Res (*functionValueAsTemplateParameter)(C&, Args...)>
 struct Delegate<Res(Args...)>::MakeCallerForFunctionWithReference{
     static constexpr Res apply(const Delegate* self, Args... args){
         return functionValueAsTemplateParameter(
-            *static_cast<C*>(self->theCalleeAsObject),
+            *static_cast<C*>(self->state.theCalleeAsObject),
             static_cast<Args&&>(args)...
         );
     }
@@ -774,7 +731,7 @@ template<class C, Res (*functionValueAsTemplateParameter)(const C&, Args...)>
 struct Delegate<Res(Args...)>::MakeCallerForFunctionWithConstReference{
     static constexpr Res apply(const Delegate* self, Args... args){
         return functionValueAsTemplateParameter(
-            *static_cast<const C*>(self->theCalleeAsConstObject),
+            *static_cast<const C*>(self->state.theCalleeAsConstObject),
             static_cast<Args&&>(args)...
         );
     }
@@ -785,7 +742,7 @@ template<class C, Res (*functionValueAsTemplateParameter)(C*, Args...)>
 struct Delegate<Res(Args...)>::MakeCallerForFunctionWithPointer{
     static constexpr Res apply(const Delegate* self, Args... args){
         return functionValueAsTemplateParameter(
-            static_cast<C*>(self->theCalleeAsObject),
+            static_cast<C*>(self->state.theCalleeAsObject),
             static_cast<Args&&>(args)...
         );
     }
@@ -806,7 +763,7 @@ template<class Res, class... Args>
 constexpr Res Delegate<Res(Args...)>::operator()(Args... args) const {
     //Forward call arguments to the actual caller
     //Note: forwarding manually with static_cast<Args&&> since AVR has no std::forward defined
-    return correspondingCaller(this, static_cast<Args&&>(args)...);
+    return state.correspondingCaller(this, static_cast<Args&&>(args)...);
 }
 
 
@@ -817,24 +774,24 @@ constexpr Delegate<Res(Args...)>::Delegate(Functor& functor)
 
 template<class Res, class... Args>
 constexpr Delegate<Res(Args...)>::Delegate(SimpleCaseCallee* simpleCaseCalleeFunction)
-    : correspondingCaller(callSimpleCase), simpleCaseCallee(simpleCaseCalleeFunction) {}
+    : state(callSimpleCase, simpleCaseCalleeFunction) {}
 
 
 template<class Res, class... Args>
-constexpr Delegate<Res(Args...)>::Delegate(InternalCallerType* caller)
-    : correspondingCaller(caller) {}
-
-template<class Res, class... Args>
-constexpr Delegate<Res(Args...)>::Delegate(
-    InternalCallerType* caller, void* theCalleeAsObjectToUse
-)
-    : correspondingCaller(caller), theCalleeAsObject(theCalleeAsObjectToUse){}
+constexpr Delegate<Res(Args...)>::Delegate(RawCallerType* caller)
+    : state(caller) {}
 
 template<class Res, class... Args>
 constexpr Delegate<Res(Args...)>::Delegate(
-    InternalCallerType* caller, const void* theCalleeAsObjectToUse
+    RawCallerType* caller, void* theCalleeAsObjectToUse
 )
-    : correspondingCaller(caller), theCalleeAsConstObject(theCalleeAsObjectToUse){}
+    : state(caller, theCalleeAsObjectToUse){}
+
+template<class Res, class... Args>
+constexpr Delegate<Res(Args...)>::Delegate(
+    RawCallerType* caller, const void* theCalleeAsObjectToUse
+)
+    : state(caller, theCalleeAsObjectToUse){}
 
 
 template<class Res, class... Args>
@@ -856,17 +813,9 @@ template<class Res, class... Args>
 constexpr Delegate<Res(Args...)>::operator bool() const {
     /* the only way to create Delegate around nullptr is passing
        null as simpleCaseCalleeFunction to constructor */
-    return callSimpleCase != correspondingCaller || nullptr != simpleCaseCallee;
+    return callSimpleCase != state.correspondingCaller || nullptr != state.simpleCaseCallee;
 }
 
-
-template<class Res, class... Args>
-template<class Functor>
-constexpr Delegate<Res(Args...)>
-    Delegate<Res(Args...)>::Unstorable(Functor&& functor)
-{
-    return Delegate(MakeCallerForFunctor<Functor>::apply, &functor);
-}
 
 
 template<class Res, class... Args>
@@ -891,8 +840,17 @@ constexpr bool Delegate<Res(Args...)>::operator !=(const Delegate& other) const{
 
 
 template<class Res, class... Args>
+template<class Functor>
+constexpr Delegate<Res(Args...)>
+    Delegate<Res(Args...)>::Unstorable(Functor&& functor)
+{
+    return Delegate(MakeCallerForFunctor<Functor>::apply, &functor);
+}
+
+
+template<class Res, class... Args>
 constexpr Res Delegate<Res(Args...)>::callSimpleCase(const Delegate* self, Args... args){
-    return self->simpleCaseCallee(static_cast<Args&&>(args)...);
+    return self->state.simpleCaseCallee(static_cast<Args&&>(args)...);
 }
 
 
@@ -900,23 +858,28 @@ constexpr Res Delegate<Res(Args...)>::callSimpleCase(const Delegate* self, Args.
 template<class Res, class... Args>
 constexpr int Delegate<Res(Args...)>::cmpTo(const Delegate& other) const{
     static_assert(
-        sizeof(Delegate::theCalleeAsObject) == sizeof(Delegate::simpleCaseCallee),
+        sizeof(State::theCalleeAsObject) == sizeof(State::simpleCaseCallee),
         "Comparison will not work if sizes are different"
     );
     static_assert(
-        sizeof(Delegate::theCalleeAsObject) == sizeof(Delegate::theCalleeAsConstObject),
+        sizeof(State::theCalleeAsObject) == sizeof(State::theCalleeAsConstObject),
         "Comparison will not work if pointer sizes are different"
     );
 
     static_assert(
-        sizeof(Delegate::theCalleeAsObject) + sizeof(Delegate::simpleCaseCallee)
-        == sizeof(Delegate),
-        "Comparison will not work if fields do not occupy full Delegate instance"
+        sizeof(State::theCalleeAsObject) + sizeof(State::simpleCaseCallee)
+        == sizeof(State),
+        "Comparison will not work if fields do not occupy full State instance"
+    );
+
+    static_assert(
+        sizeof(State) == sizeof(Delegate),
+        "State shall State full Delegate instance"
     );
 
     //relax condition for callsCountBeforeInitialization (but comparing futures is undefined)
     static_assert(
-        sizeof(Delegate::theCalleeAsObject) >= sizeof(Delegate::callsCountBeforeInitialization),
+        sizeof(State::theCalleeAsObject) >= sizeof(State::callsCountBeforeInitialization),
         "Comparison will not work if sizes do not fit"
     );
 
@@ -943,5 +906,7 @@ constexpr int Delegate<Res(Args...)>::cmpTo(const Delegate& other) const{
 
 
 //TODO: reduce? map?
+/*TODO:
 
+*/
 #endif
