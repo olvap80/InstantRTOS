@@ -303,7 +303,7 @@ SOFTWARE.
 
 #ifndef InstantCallback_Panic
 #   ifdef InstantRTOS_Panic
-#       define InstantCallback_Panic() InstantRTOS_Panic('T')  
+#       define InstantCallback_Panic() InstantRTOS_Panic('B')  
 #   else
 #       define InstantCallback_Panic() /* you can customize here! */ do{}while(true)
 #   endif
@@ -321,6 +321,34 @@ SOFTWARE.
 #       define InstantCallback_EnterCritical
 #       define InstantCallback_LeaveCritical
 #   endif
+#endif
+
+
+//______________________________________________________________________________
+// Handle C++ versions (just skip to "Classes for handling tasks" below))
+
+#if defined(__cplusplus)
+#   if __cplusplus >= 201703L
+#       if __cplusplus >= 202002L
+#           define InstantCallbackNodiscard(explainWhy) [[nodiscard(explainWhy)]]
+#       else
+#           define InstantCallbackNodiscard(explainWhy) [[nodiscard]]
+#       endif
+#   else
+#       ifdef __GNUC__
+#           define InstantCallbackNodiscard(explainWhy) __attribute__((warn_unused_result))
+#       elif defined(_MSVC_LANG) && _MSVC_LANG >= 201703L
+#           if _MSVC_LANG >= 202002L
+#               define InstantCallbackNodiscard(explainWhy) [[nodiscard(explainWhy)]]
+#           else
+#               define InstantCallbackNodiscard(explainWhy) [[nodiscard]]
+#           endif
+#       endif
+#   endif
+#endif
+
+#if !defined(InstantCallbackNodiscard)
+#       define InstantCallbackNodiscard(explainWhy)
 #endif
 
 
@@ -355,6 +383,9 @@ In your usual case you pass only reservedCount to CallbackFrom
 See also https://en.cppreference.com/w/cpp/language/function_template
          section Template argument deduction */
 template<unsigned reservedCount, class AdditionalOptionalTag = void, class LambdaType>
+InstantCallbackNodiscard(
+    "One shall use and call result of CallbackFrom or else memory is lost forever"
+)
 auto CallbackFrom(LambdaType&& lambda) -> 
     InternalTrampolineDetails::SimpleSignatureFromLambda<LambdaType>*;
 
@@ -756,6 +787,9 @@ namespace InternalTrampolineDetails{
 
 
 template<unsigned reservedCount, class AdditionalOptionalTag, class LambdaType>
+InstantCallbackNodiscard(
+    "One shall use and call result of CallbackFrom or else memory is lost forever"
+)
 auto CallbackFrom(LambdaType&& lambda) -> 
     InternalTrampolineDetails::SimpleSignatureFromLambda<LambdaType>*
 {

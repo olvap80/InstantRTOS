@@ -17,27 +17,30 @@ OPTION1:
  @code
     #define InstantRTOS_EnterCritical { uint8_t oldSREG_value = SREG; cli();
     #define InstantRTOS_LeaveCritical SREG = oldSREG_value}
-    #define InstantScheduler_MutexObject
  @endcode
 OPTION2:
  @code
     #define InstantRTOS_EnterCritical ATOMIC_BLOCK(ATOMIC_RESTORESTATE){
     #define InstantRTOS_LeaveCritical }
-    #define InstantScheduler_MutexObject
  @endcode
 
-Please note that InstantScheduler_MutexObject is "defined to nothing",
-because we "disable all interrupts" for specific platform.
-The InstantRTOS_MutexObject could be useful on those plaforms, where
-there is no "disable interrupts" operation to use but mutex is present
+The InstantRTOS_MutexObjectType and InstantRTOS_MutexObjectVariable could be
+useful on those plaforms, where there is no "disable interrupts" operation
+to use but mutex is present. The InstantRTOS takes care to place macro
+InstantRTOS_MutexObjectType and InstantRTOS_MutexObjectVariable in the right
+place in the code, so it will be visible to Enter/LeaveCritical macros.
  @code
-    //TODO: sample with mutex here
+    TODO: sample here
+    #define InstantRTOS_EnterCritical
+    #define InstantRTOS_LeaveCritical
+    #define InstantRTOS_MutexObjectType
+    #define InstantRTOS_MutexObjectVariable
  @endcode
 
-NOTE: definitely you CANNOT obtain mutex from interrupt,
+NOTE:   definitely you CANNOT obtain mutex from interrupt,
         sample above is only to illustrate concept
-        for using InstantRTOS together with other with other RT(OS)
-        and is
+        for using InstantRTOS together with other with other (RT)OS
+        where only mutex is available.
 
 TODO: what about scoped macro?
 TODO: move this to corresponding file

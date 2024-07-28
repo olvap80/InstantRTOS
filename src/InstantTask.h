@@ -223,7 +223,10 @@ SOFTWARE.
 #   if defined(InstantRTOS_EnterCritical) && !defined(InstantTask_SuppressEnterCritical)
 #       define InstantTask_EnterCritical InstantRTOS_EnterCritical
 #       define InstantTask_LeaveCritical InstantRTOS_LeaveCritical
-#       define InstantTask_MutexObject InstantRTOS_MutexObject
+#       if defined(InstantRTOS_MutexObjectType)
+#           define InstantTask_MutexObjectType InstantRTOS_MutexObjectType
+#           define InstantTask_MutexObjectVariable InstantRTOS_MutexObjectVariable
+#       endif
 #   else
 #       define InstantTask_EnterCritical
 #       define InstantTask_LeaveCritical
@@ -245,6 +248,12 @@ SOFTWARE.
 #   else
 #       ifdef __GNUC__
 #           define TaskNodiscard(explainWhy) __attribute__((warn_unused_result))
+#       elif defined(_MSVC_LANG) && _MSVC_LANG >= 201703L
+#           if _MSVC_LANG >= 202002L
+#               define TaskNodiscard(explainWhy) [[nodiscard(explainWhy)]]
+#           else
+#               define TaskNodiscard(explainWhy) [[nodiscard]]
+#           endif
 #       endif
 #   endif
 #endif

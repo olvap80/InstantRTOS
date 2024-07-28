@@ -420,7 +420,9 @@ private:
 inline ChainElement::~ChainElement(){
     //assertion to ensure enclosing chain is not broken
     if( !IsChainElementSingle() ){
-        //Destroying before removed from the chain
+        /* Destroying before removed from the chain
+           is likely an error (because those chain elements
+           usually have additional logic) */
         InstantIntrusiveListPanic();
     }
 }

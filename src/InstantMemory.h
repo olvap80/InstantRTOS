@@ -5,8 +5,8 @@
 (c) see https://github.com/olvap80/InstantRTOS
 
 Zero dependencies, works instantly by copy pasting to your project...
-Inspired by memory management toolset available in various RTOSes,
-and now available in C++ :)
+Inspired by memory management tool set available in various RTOSes,
+and now available in pure C++ :)
 
 The BlockPool is intended to be allocated statically and then used
 for memory allocation.
@@ -182,8 +182,6 @@ SOFTWARE.
 //______________________________________________________________________________
 // Portable configuration (just skip to "Classes for memory operations" below))
 
-#define InstantMemory_BlockPoolCountInMetadata
-
 /* Keep promise to not use any standard libraries by default, 
    but types from those header still must have */
 #if defined(InstantRTOS_USE_STDLIB) || defined(__has_include)
@@ -251,6 +249,10 @@ SOFTWARE.
     inline void* operator new(INSTANTMEMORY_SIZE_T, InstantMemoryPlaceholderHelper place) noexcept{
         return place.ptr;
     }
+    /// Make compiler happy with explicit empty delete operator
+    inline void operator delete(void*, InstantMemoryPlaceholderHelper place) noexcept{
+        //do nothing, as we do not allocate memory
+    }
 #endif
 
 
@@ -276,28 +278,31 @@ SOFTWARE.
 #   if defined(InstantRTOS_EnterCritical) && !defined(InstantMemory_SuppressEnterCritical)
 #       define InstantMemory_EnterCritical InstantRTOS_EnterCritical
 #       define InstantMemory_LeaveCritical InstantRTOS_LeaveCritical
-#       define InstantMemory_MutexObject InstantRTOS_MutexObject
+#       if defined(InstantRTOS_MutexObjectType)
+#           define InstantMemory_MutexObjectType InstantRTOS_MutexObjectType
+#           define InstantMemory_MutexObjectVariable InstantRTOS_MutexObjectVariable
+#       endif
 #   else
 #       define InstantMemory_EnterCritical
 #       define InstantMemory_LeaveCritical
-#       define InstantMemory_MutexObject
 #   endif
 #endif
 
+
 //______________________________________________________________________________
-// Classes for memory operations - BlockPool and variations
+// Classes for memory operations - CommonBlockPool and variations
 
 
-///Optimized base for BlockPool (used for all kinds of BlockPools below)
+///Optimized base used for all kinds of BlockPools below
 /** All various BlockPools reuse the same implementation
  *  to save program space being spent on allocation/deallocation logic.
- *  Use SimpleBlockPool or SmartAllocator (TBD) below
+ *  Use BlockPool, SharedAllocator, or SmartAllocator (TBD) below
  *  (NOTE: single implementation to not duplicate code for each type) */
-class BlockPool{
+class CommonBlockPool{
 public:
     //all the copying is banned
-    constexpr BlockPool(const BlockPool&) = delete;
-    BlockPool& operator =(const BlockPool&) = delete;
+    constexpr CommonBlockPool(const CommonBlockPool&) = delete;
+    CommonBlockPool& operator =(const CommonBlockPool&) = delete;
 
     //NOTE: for actual allocation API see corresponding derived classes
 
@@ -310,47 +315,67 @@ public:
 
     /// How much bytes are available in custom part of block
     constexpr SizeType BlockSize() const;
-
     /// Maximum number of blocks available for allocation
     constexpr SizeType TotalBlocks() const;
-
     /// How many blocks are allocated so far
     constexpr SizeType BlocksAllocated() const;
 
-    ///"Raw" allocate of any free block, returned null if no more blocks available
-    /** Obtain raw uninitialized bytes */
+    ///"Raw" allocate of any free block, returns null when no more blocks
+    /** Obtain raw uninitialized bytes (entire block), no constructor is called.
+     * One can use Make* API from derived classes for allocation */
     void* AllocateRaw();
 
-
     /// Free raw bytes, do not issue any destructors!
+    /** Free entire block as "just bytes" without initialization,
+     * panic if block was not allocated by this CommonBlockPool */
     static void FreeRaw(void* memoryPreviouslyAllocatedByBlockPool);
 
+
     /// "Raw" deallocation with destructor, panic if not allocated here
+    /** Free block and call destructor of TBeingPlacedWhileAllocating,
+     * panic if block was not allocated by this CommonBlockPool.
+     * One can use Make* API from derived classes for allocation */
     template<class TBeingPlacedWhileAllocating>
     static void Free(TBeingPlacedWhileAllocating* correspondingAllocatedObject);
-    
-    /// Use this for determining minimum alignment requirements
-    struct Metadata{
+
+    /// Metadata to be placed at the beginning of each block
+    /** Aso use this for determining minimum alignment requirements.
+     * Always goes just before custom part of the block,
+     * appending more metadata.
+     * It is up to derived class to ensure with EntireBlockSize(...)
+     * that entireBlockSizeUsed is large enough to hold metadata */
+    class Metadata{
+    private:
+        friend class CommonBlockPool; ///<The only one who can access internals
         union{
-            BlockPool* owner; ///<Internal usage
-            ByteType* next; ///<Internal usage
-            SizeType s; ///<Internal usage (for alignment purposes)
+            ByteType* next; ///<When free, points to the next free block
+            CommonBlockPool* owner; ///<As allocated, points to CommonBlockPool
         };
-#ifdef InstantMemory_BlockPoolCountInMetadata
-        /// TODO: do we need this?
-        SizeType useCount;
-#endif
     };
 
-    /// Helper to use in assertions for type sizes
-    template<SizeType N>
-    struct IsPowerOfTwo {
-        static constexpr bool value = 0 != ((N >= 1) & !(N & (N - 1)));
-    };
-    static_assert(
-        IsPowerOfTwo<sizeof(Metadata)>::value,
-        "sizeof(Metadata) shall be power of two"
+protected:
+    /// @Make gcc happy with C++ 11
+    constexpr CommonBlockPool() = delete;
+
+    ///Initialize CommonBlockPool logic
+    /** One must be sure memoryArea contains at least
+     *  entireBlockSizeUsed*totalBlocksAvailable bytes!
+     *  Metadata is added to the end of */
+    CommonBlockPool(
+        ByteType* memoryArea, ///< CommonBlockPool will place allocated blocks here,
+                              ///< there shall be space enough to hold
+                              ///< entireBlockSizeUsed*totalBlocksAvailable bytes
+        SizeType customBlockSizeUsed, ///Custom part in the block (without metadata)
+        SizeType entireBlockSizeUsed, ///<Entire block size (as calculated by EntireBlockSize)
+        SizeType totalBlocksAvailable ///<Total number of full blocks reserved
     );
+
+    /// Helper to use in assertions for type sizes and alignments
+    template<SizeType N>
+    struct IsPowerOfTwo{
+        static constexpr bool value = 0 != ((N >= 1) & !(N & (N - 1))); };
+    static_assert(  IsPowerOfTwo<sizeof(Metadata)>::value,
+                    "sizeof(Metadata) shall be power of two" );
 
     /// Calculate size of the block together with helper information (Metadata)
     /** The EntireBlockSize takes into account place for Metadata 
@@ -359,31 +384,12 @@ public:
      * size compatible with requestedAlignment,
      * and that both requestedAlignment and sizeof(Metadata) are power of two */
     static constexpr SizeType EntireBlockSize(
-        SizeType customBlockSizeRequested,
-        SizeType requestedAlignment
-    );
+        SizeType customBlockSizeRequested, SizeType requestedAlignment);
 
-protected:
-    /// @Make gcc happy with C++ 11
-    constexpr BlockPool() = delete;
-
-    ///Initialize BlockPool logic
-    /** One must be sure memoryArea contains at least
-     *  entireBlockSizeUsed*totalBlocksAvailable bytes!
-     *  Metadata is added to the end of */
-    BlockPool(
-        ByteType* memoryArea, ///< BlockPool will place allocated blocks here,
-                              ///< there shall be space enough to hold
-                              ///< entireBlockSizeUsed*totalBlocksAvailable bytes
-        SizeType customBlockSizeUsed, ///Custom part in the block
-        SizeType entireBlockSizeUsed, ///<Entire block size (as calculated by EntireBlockSize)
-        SizeType totalBlocksAvailable ///<Total number of full blocks reserved
-    );
-    
 private:
-    /// Constant to mark BlockPool instances for debugging purposes
+    /// Constant to mark CommonBlockPool instances for debugging purposes
     static constexpr SizeType MarkToTest = 24991;
-    /// Mark BlockPool instances for debugging purposes
+    /// Mark CommonBlockPool instances for debugging purposes
     const SizeType mark = MarkToTest;
 
     /// Custom pa
@@ -406,71 +412,53 @@ private:
 };
 
 
-/// Common allocation operations on BlockPool
-template<BlockPool::SizeType SingleBlockSizeRequested>
-class BlockPoolAllocator: public BlockPool{
+///Simple pool to allocate fixed size blocks
+/** Allow allocation of raw pointer to fixed size memory blocks */
+template<
+    CommonBlockPool::SizeType SingleBlockSizeRequested,
+    CommonBlockPool::SizeType TotalNumBlocks,
+    class AlignAsType = CommonBlockPool::Metadata
+>
+class BlockPool: public CommonBlockPool{
+    static_assert(
+        SingleBlockSizeRequested % alignof(AlignAsType) == 0,
+        "CommonBlockPool: ensure your blocks are of proper size allowing proper alignment"
+    );
 public:
-    using BlockPool::BlockPool;
+    /// Create ready to use BlockPool
+    constexpr BlockPool();
 
     ///Allocation with simultaneous construction (and static check for size))
+    /** Use MakePtr to allocate and construct object of TBeingPlacedWhileAllocating
+     *  in the block, panic if block is not available */
     template<class TBeingPlacedWhileAllocating, class... Args>
-    TBeingPlacedWhileAllocating* Allocate(Args&&... args);
+    TBeingPlacedWhileAllocating* MakePtr(Args&&... args);
 
-    /// RAII to enclose unique allocation from corresponding BlockPool
-    ///TODO: move this to BlockPool above
+
+    /// RAII to enclose unique allocation from corresponding CommonBlockPool
     template<class TBeingPlacedWhileAllocating>
     class UniqueAllocation{
     public:
     private:
     };
 
-    /// RAII for unique allocation in BlockPool 
+    /// RAII for unique allocation in CommonBlockPool 
     template<class TBeingPlacedWhileAllocating, class... Args>
-    UniqueAllocation<TBeingPlacedWhileAllocating> AllocateUnique(Args&&... args);
-
-    /// RAII to enclose unique allocation from corresponding BlockPool
-    ///TODO: move this to BlockPool above
-    ///TODO: two strategies of place for counter
-    template<class TBeingPlacedWhileAllocating>
-    class SharedAllocation{
-    public:
-    private:
-    };
-
-    /// RAII for shared allocation in BlockPool 
-    template<class TBeingPlacedWhileAllocating, class... Args>
-    SharedAllocation<TBeingPlacedWhileAllocating> AllocateShared(Args&&... args);
-};
-
-///Simple pool to allocate fixed size blocks
-/** Allow allocation of raw pointer to fixed size memory blocks */
-template<
-    BlockPool::SizeType SingleBlockSizeRequested,
-    BlockPool::SizeType TotalNumBlocks,
-    class AlignAsType = BlockPool::Metadata
->
-class SimpleBlockPool: public BlockPoolAllocator<SingleBlockSizeRequested>{
-    static_assert(
-        SingleBlockSizeRequested % alignof(AlignAsType) == 0,
-        "BlockPool: ensure your blocks are of proper size allowing proper alignment"
-    );
-public:
-    /// Create ready to use SimpleBlockPool
-    constexpr SimpleBlockPool();
+    UniqueAllocation<TBeingPlacedWhileAllocating> MakeUnique(Args&&... args);
 
 private:
-    static constexpr BlockPool::SizeType entireBlockSize =
-        BlockPool::EntireBlockSize(SingleBlockSizeRequested, alignof(AlignAsType));
+    static constexpr CommonBlockPool::SizeType entireBlockSize =
+        CommonBlockPool::EntireBlockSize(SingleBlockSizeRequested, alignof(AlignAsType));
     
     static_assert(
-        BlockPool::IsPowerOfTwo<alignof(AlignAsType)>::value,
+        CommonBlockPool::IsPowerOfTwo<alignof(AlignAsType)>::value,
         "alignof(AlignAsType) shall be power of two"
     );
     
     /// Actual memory for blocks allocated as a single chunk
     /** Allocation info is not intermixed with allocated bytes,
      * thus there are no problems with alignments and strict aliasing */
-    alignas(AlignAsType) BlockPool::ByteType memoryForBlocks[
+    alignas(AlignAsType) CommonBlockPool::ByteType memoryForBlocks[
         entireBlockSize*TotalNumBlocks
     ];
 };
@@ -539,7 +527,7 @@ public:
 private:
     ///Actual location of that object
     /** See also https://en.cppreference.com/w/cpp/language/new#Placement_new */
-    alignas(T) BlockPool::ByteType placeInMemory[ sizeof(T) ];
+    alignas(T) CommonBlockPool::ByteType placeInMemory[ sizeof(T) ];
 
     bool exists = false;
 };
@@ -570,6 +558,21 @@ private:
 /// TODO: SmartAllocator not yet ready! implement later
 #if 0
 
+class SharedAllocator{
+public:
+        /// RAII to enclose unique allocation from corresponding CommonBlockPool
+    ///TODO: two strategies of place for counter
+    template<class TBeingPlacedWhileAllocating>
+    class SharedAllocation{
+    public:
+    private:
+    };
+
+    /// RAII for shared allocation in CommonBlockPool 
+    template<class TBeingPlacedWhileAllocating, class... Args>
+    SharedAllocation<TBeingPlacedWhileAllocating> AllocateShared(Args&&... args);
+};
+
 ///Specialization defines value of expected instance count for SmartAllocator
 /** Sample usage
     @code
@@ -579,8 +582,8 @@ template<class ClassToDetermineExpectedCount>
 class SmartAllocatorExpectedCount;
 
 ///Smart pool associated to type to allocate fixed size blocks
-/** Uses SmartAllocatorExpectedCount to determine associated BlockPool capacity
- * nested Allocate API returns smart pointer that keeps allocated instance alive */
+/** Uses SmartAllocatorExpectedCount to determine associated CommonBlockPool capacity
+ * nested MakeShared API returns smart pointer that keeps allocated instance alive */
 template<class T>
 class SmartAllocator{
 public:
@@ -589,7 +592,7 @@ public:
     class Ptr{};
 
     template<class... Args>
-    Ptr Allocate(Args... args);
+    Ptr MakeShared(Args... args);
 
 private:
 
@@ -608,9 +611,9 @@ private:
 
 
 //______________________________________________________________________________
-// Implementing BlockPool
+// Implementing CommonBlockPool
 
-inline constexpr BlockPool::SizeType BlockPool::entireAlignedBlockSize(
+inline constexpr CommonBlockPool::SizeType CommonBlockPool::entireAlignedBlockSize(
     SizeType customBlockSizeRequested,
     SizeType alignmentWithMetadata
 ){
@@ -623,20 +626,20 @@ inline constexpr BlockPool::SizeType BlockPool::entireAlignedBlockSize(
         ) * alignmentWithMetadata;
 }
 
-inline constexpr BlockPool::SizeType BlockPool::BlockSize() const{
+inline constexpr CommonBlockPool::SizeType CommonBlockPool::BlockSize() const{
     return customBlockSize;
 }
 
-inline constexpr BlockPool::SizeType BlockPool::TotalBlocks() const{
+inline constexpr CommonBlockPool::SizeType CommonBlockPool::TotalBlocks() const{
     return totalBlocks;
 }
 
-inline constexpr BlockPool::SizeType BlockPool::BlocksAllocated() const{
+inline constexpr CommonBlockPool::SizeType CommonBlockPool::BlocksAllocated() const{
     return blocksAllocated;
 }
 
 
-inline void* BlockPool::AllocateRaw(){
+inline void* CommonBlockPool::AllocateRaw(){
     ByteType* res = firstFree;
     if( res ){
         auto metadata = reinterpret_cast<Metadata*>(res - sizeof(Metadata));
@@ -651,12 +654,12 @@ inline void* BlockPool::AllocateRaw(){
     return nullptr;
 }
 
-inline void BlockPool::FreeRaw(void* memoryPreviouslyAllocatedByBlockPool){
+inline void CommonBlockPool::FreeRaw(void* memoryPreviouslyAllocatedByBlockPool){
     if( nullptr != memoryPreviouslyAllocatedByBlockPool ){
         ByteType* ptr = reinterpret_cast<ByteType*>(memoryPreviouslyAllocatedByBlockPool);
         
         auto metadata = reinterpret_cast<Metadata*>(ptr - sizeof(Metadata));
-        BlockPool* owner = metadata->owner;
+        CommonBlockPool* owner = metadata->owner;
         if( owner->mark == MarkToTest ){
             // valid block, almost for sure))
             metadata->next = owner->firstFree;
@@ -671,7 +674,7 @@ inline void BlockPool::FreeRaw(void* memoryPreviouslyAllocatedByBlockPool){
 }
 
 template<class TBeingPlacedWhileAllocating>
-void BlockPool::Free(TBeingPlacedWhileAllocating* correspondingAllocatedObject)
+void CommonBlockPool::Free(TBeingPlacedWhileAllocating* correspondingAllocatedObject)
 {
     if( nullptr == correspondingAllocatedObject ){
         return;
@@ -682,7 +685,7 @@ void BlockPool::Free(TBeingPlacedWhileAllocating* correspondingAllocatedObject)
 
 
 
-inline BlockPool::BlockPool(
+inline CommonBlockPool::CommonBlockPool(
     ByteType* memoryArea,
     SizeType customBlockSizeUsed,
     SizeType entireBlockSizeUsed,
@@ -711,7 +714,7 @@ inline BlockPool::BlockPool(
     )->next = nullptr;
 }
 
-inline constexpr BlockPool::SizeType BlockPool::EntireBlockSize(
+inline constexpr CommonBlockPool::SizeType CommonBlockPool::EntireBlockSize(
     SizeType customBlockSizeRequested,
     SizeType requestedAlignment
 ){
@@ -725,12 +728,31 @@ inline constexpr BlockPool::SizeType BlockPool::EntireBlockSize(
 
 
 //______________________________________________________________________________
-// Implementing BlockPoolAllocator
+// Implementing SimpleBlockPool
 
-template<BlockPool::SizeType SingleBlockSizeRequested>
+template<
+    CommonBlockPool::SizeType SingleBlockSizeRequested,
+    CommonBlockPool::SizeType TotalNumBlocks,
+    class AlignAsType
+>
+constexpr BlockPool<SingleBlockSizeRequested, TotalNumBlocks, AlignAsType>
+::BlockPool()
+:   CommonBlockPool(
+        memoryForBlocks,
+        SingleBlockSizeRequested,
+        entireBlockSize,
+        TotalNumBlocks
+    )
+{}
+
+template<
+    CommonBlockPool::SizeType SingleBlockSizeRequested,
+    CommonBlockPool::SizeType TotalNumBlocks,
+    class AlignAsType
+>
 template<class TBeingPlacedWhileAllocating, class... Args>
 TBeingPlacedWhileAllocating* 
-BlockPoolAllocator<SingleBlockSizeRequested>::Allocate(Args&&... args){
+BlockPool<SingleBlockSizeRequested, TotalNumBlocks, AlignAsType>::MakePtr(Args&&... args){
     //see https://eli.thegreenplace.net/2014/perfect-forwarding-and-universal-references-in-c
     static_assert(
         sizeof(TBeingPlacedWhileAllocating) <= SingleBlockSizeRequested,
@@ -742,25 +764,8 @@ BlockPoolAllocator<SingleBlockSizeRequested>::Allocate(Args&&... args){
         return new( InstantMemoryPlaceholderHelper(rawMemory) )
                     TBeingPlacedWhileAllocating(static_cast<Args&&>(args)...);
     }
-    return nullptr;
+    InstantMemory_Panic();
 }
-
-
-//______________________________________________________________________________
-// Implementing SimpleBlockPool
-
-template<
-    BlockPool::SizeType SingleBlockSizeRequested,
-    BlockPool::SizeType TotalNumBlocks,
-    class AlignAsType
->
-constexpr SimpleBlockPool<SingleBlockSizeRequested, TotalNumBlocks, AlignAsType>
-::SimpleBlockPool()
-:   BlockPoolAllocator<SingleBlockSizeRequested>(
-        memoryForBlocks, SingleBlockSizeRequested, entireBlockSize, TotalNumBlocks
-    )
-{}
-
 
 //______________________________________________________________________________
 // Implementing LifetimeManager

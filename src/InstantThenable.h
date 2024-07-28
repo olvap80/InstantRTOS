@@ -81,10 +81,13 @@ SOFTWARE.
         //we have access from interrupts and/or multithreading
 #       define InstantThenable_EnterCritical InstantRTOS_EnterCritical
 #       define InstantThenable_LeaveCritical InstantRTOS_LeaveCritical
-#       define InstantThenable_MutexObject InstantRTOS_MutexObject
+#       if defined(InstantRTOS_MutexObjectType)
+#           define InstantThenable_MutexObjectType InstantRTOS_MutexObjectType
+#           define InstantThenable_MutexObjectVariable InstantRTOS_MutexObjectVariable
+#       endif
 #   else
 #       if 1
-            //no interrupts/multithreading, so optimize it out
+            //no interrupts/multithreading, so optimize it out where possible
 #           define InstantThenable_NoMultithreadingProtection
             //do not change in this branch, activate next branch to tune manually 
 #           define InstantThenable_EnterCritical
@@ -94,7 +97,6 @@ SOFTWARE.
             //(usually not needed to get here, is mutually )
 #           define InstantThenable_EnterCritical
 #           define InstantThenable_LeaveCritical
-#           define InstantThenable_MutexObject
 #       endif
 #   endif
 #endif
@@ -216,8 +218,8 @@ private:
     /// Store value for the time when there is no subscription
     LifetimeManager<T> storedResult;
 
-#ifndef InstantThenable_NoMultithreadingProtection
-    InstantThenable_MutexObject;
+#if !defined(InstantThenable_NoMultithreadingProtection) && defined(InstantThenable_MutexObjectType)
+    InstantThenable_MutexObjectType InstantThenable_MutexObjectVariable;
 #endif
 };
 
@@ -325,8 +327,8 @@ private:
     /// Special helper for ExplicitlyIgnore
     static void doNothing(){}
 
-#ifndef InstantThenable_NoMultithreadingProtection
-    InstantThenable_MutexObject;
+#if !defined(InstantThenable_NoMultithreadingProtection) && defined(InstantThenable_MutexObjectType)
+    InstantThenable_MutexObjectType InstantThenable_MutexObjectVariable;
 #endif
 };
 
@@ -515,7 +517,7 @@ void ThenableToResolve<T>::operator()(const T& result){
         ){
             copy = *static_cast<Callback*>(this);
 
-            Callback::state.correspondingCaller = markerForThenableWithoutSubscription;
+            Callback::state.correspondingCaller = Thenable<T>::markerForThenableWithoutSubscription;
             Callback::state.untrackedEventsCount = 0;
         }
         else{

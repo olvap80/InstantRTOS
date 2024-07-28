@@ -177,18 +177,18 @@ as a fast and compact C++ delegates for embedded platforms, like Arduino:
         test(
             Delegate<int(int)>::From(demoCallable5).Bind<&TestClass::test_method>()
         );
-        //Ensure method pointer can be created with short syntax
+        //Ensure method pointer can be created
         TestClass demoCallable6{6};
         test(
             Delegate<int(int)>::From(&demoCallable6).Bind<&TestClass::test_method>()
         );
 
-        //Ensure method pointer can be created from reference
+        //Ensure method pointer can be created from function receiving reference
         TestClass demoCallable7{7};
         test(
             Delegate<int(int)>::From(demoCallable7).Bind<&function_to_bind_receivingRef>()
         );
-        //Ensure method pointer can be created with short syntax
+        //Ensure method pointer can be created from function receiving pointer
         TestClass demoCallable8{8};
         test(
             Delegate<int(int)>::From(&demoCallable8).Bind<&function_to_bind_receivingPtr>()
@@ -211,7 +211,7 @@ that can be treated as a type-erased callable reference
 but Delegate from InstantDelegate.h is also able to handle method pointers,
 and uses only two words to hold minimal closure!
 Generated code for trampolines contains called functions embedded
-Or is produces proper tail calls https://godbolt.org/z/dW6eMdWb6
+or it produces proper tail calls https://godbolt.org/z/dW6eMdWb6
  @code
     Delegate<int (int)>::MakeCallerForFunctor<loop()::$_1>::apply(Delegate<int (int)> const*, int): # @"Delegate<int (int)>::MakeCallerForFunctor<loop()::$_1>::apply(Delegate<int (int)> const*, int)"
         movl    %esi, %eax
@@ -221,10 +221,10 @@ Or is produces proper tail calls https://godbolt.org/z/dW6eMdWb6
         retq
     Delegate<int (int)>::MakeCallerForConstMethod<TestClass const, &(TestClass::test_method(int) const)>::apply(Delegate<int (int)> const*, int): # @Delegate<int (int)>::MakeCallerForConstMethod<TestClass const, &(TestClass::test_method(int) const)>::apply(Delegate<int (int)> const*, int)
         movq    8(%rdi), %rdi
-        jmp     TestClass::test_method(int) const   # TAILCALL
+        jmp     TestClass::test_method(int) const   # TAIL CALL
     Delegate<int (int)>::MakeCallerForConstMethod<TestClass, &(TestClass::test_method(int) const)>::apply(Delegate<int (int)> const*, int): # @Delegate<int (int)>::MakeCallerForConstMethod<TestClass, &(TestClass::test_method(int) const)>::apply(Delegate<int (int)> const*, int)
         movq    8(%rdi), %rdi
-        jmp     TestClass::test_method(int) const   # TAILCALL
+        jmp     TestClass::test_method(int) const   # TAIL CALL
  @endcode
 See also https://godbolt.org/z/1ddGKs3PY for major compilers
 

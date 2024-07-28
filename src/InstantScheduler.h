@@ -89,11 +89,13 @@ SOFTWARE.
 #   if defined(InstantRTOS_EnterCritical) && !defined(InstantScheduler_SuppressEnterCritical)
 #       define InstantScheduler_EnterCritical InstantRTOS_EnterCritical
 #       define InstantScheduler_LeaveCritical InstantRTOS_LeaveCritical
-#       define InstantScheduler_MutexObject InstantRTOS_MutexObject
+#       if defined(InstantRTOS_MutexObjectType)
+#           define InstantScheduler_MutexObjectType InstantRTOS_MutexObjectType
+#           define InstantScheduler_MutexObjectVariable InstantRTOS_MutexObjectVariable
+#       endif
 #   else
 #       define InstantScheduler_EnterCritical
 #       define InstantScheduler_LeaveCritical
-#       define InstantScheduler_MutexObject
 #   endif
 #endif
 

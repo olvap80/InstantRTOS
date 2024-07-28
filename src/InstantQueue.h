@@ -66,11 +66,13 @@ SOFTWARE.
 #   if defined(InstantRTOS_EnterCritical) && !defined(InstantQueue_SuppressEnterCritical)
 #       define InstantQueue_EnterCritical InstantRTOS_EnterCritical
 #       define InstantQueue_LeaveCritical InstantRTOS_LeaveCritical
-#       define InstantQueue_MutexObject InstantRTOS_MutexObject
+#       if defined(InstantRTOS_MutexObjectType)
+#           define InstantQueue_MutexObjectType InstantRTOS_MutexObjectType
+#           define InstantQueue_MutexObjectVariable InstantRTOS_MutexObjectVariable
+#       endif
 #   else
 #       define InstantQueue_EnterCritical
 #       define InstantQueue_LeaveCritical
-#       define InstantQueue_MutexObject
 #   endif
 #endif
 

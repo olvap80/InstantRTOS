@@ -31,7 +31,7 @@ Simple demo for debouncing button with "Discover" approach control LED and beep)
     #define LED_OFF digitalWrite(LED_BUILTIN, LOW)
 
     //Pin with beeper
-    #define BEEP_PIN 4
+    #define BEEP_PIN 7
 
     namespace{
         // For demo purposes generate frequency directly from the code
@@ -50,8 +50,6 @@ Simple demo for debouncing button with "Discover" approach control LED and beep)
         pinMode(LED_BUILTIN, OUTPUT);
         pinMode(BEEP_PIN, OUTPUT);
 
-        //Note: timer_led is initially expired, so we will enter under if
-        
         beep_timer.StartPeriod(micros(), 500);
     }
 
@@ -327,39 +325,29 @@ public:
      *          after the debounce cycle was performed
      *  (returned value can be used to detect state change) */
     bool Discover(
-        Ticks time, ///< Current time in the same units as in constructor
+        Ticks time, ///< Current time is measured in the same units 
+                    ///< as units in the constructor
         bool val ///< Current value corresponding to time
     ){
-        bool sameValue = (val == currentDebouncedVal);
-        
-        if( simpleTimer.Discover(time) ){
-            // We were in debounce state, and debouncing timer just expired!
-            if( !sameValue ){
-                // new debounced value was detected
-                
-                //same as currentDebouncedVal = val;
+        if( simpleTimer.IsPending() ){
+            //Debouncing is in progress right now
+            if( val == currentDebouncedVal ){
+                /* Value is the same as before debounce again, 
+                   chattering continues, value is unstable */
+                simpleTimer.Cancel();
+            }
+            else if( simpleTimer.Discover(time) ){
+                // We were in debounce state, and debouncing timer just expired!
                 currentDebouncedVal = !currentDebouncedVal;
-                
-                return true; //DIFFERENT VALUE for sure!
+                return true; //We have detected DIFFERENT VALUE for sure!
             }
-            //else means button was released before debounce time!
         }
-        else{
-            //here we are either counting debounce time or already debounced
+        else if( val != currentDebouncedVal ){
+            //new value detected, start debouncing
+            simpleTimer.Start(time, debounceInterval);
+        }
 
-            // Using != for booleans as logical XOR ))
-            if( sameValue != simpleTimer.IsExpired() ){
-                /* here != means one of:
-                1. same value while counting debounce interval
-                                            -> chattering continues
-                2. different value when previous was debounced
-                                            -> need to debounce again
-                BOTH cases mean we start timing from scratch */
-                simpleTimer.Start(time, debounceInterval);
-            }
-        }
-        
-        return false; //value did not change (yet)
+        return false;
     }
 
     ///Suppress any "incompatible" timings

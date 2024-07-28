@@ -1,14 +1,14 @@
 /** @file InstantRTOS.Config.h 
- @brief General configuration to include before files being configured
+ @brief General configuration is included before files being configured
 
 There are following "configurations" for InstantRTOS
-(InstantRTOS works perfectly without them if you do not use corresponding
-    feature, so you do not need to always define them)
+(NOTE: InstantRTOS works perfectly without them if you do not use corresponding
+       feature, so you do not need to always define them)
 
-REMEMBER: using only cooperative threads without involving interrupts and/or
-            without coexisting with other RTOS 
-            means you do not have to configure any Enter/LeaveCritical stuff,
-            just leave corresponding macros undefined :)
+REMEMBER: once using only cooperative threads (without involving interrupts
+          and/or without coexisting with other RTOS)
+          means you do not have to configure any Enter/LeaveCritical stuff,
+          just leave corresponding macros undefined :)
 
 
 # general configurations:
@@ -35,7 +35,8 @@ those that are not intended to happen but do happen.
 By default each module passes own letter to InstantRTOS_Panic, like
 InstantRTOS_Panic('Q') for queues.
 (You can easy find all those modules with searching for string
-    InstantRTOS_Panic(' via Ctrl+Shift+F/Find in Files feature :))
+    InstantRTOS_Panic('
+ via Ctrl+Shift+F/Find in Files feature :))
 
 
 # file specific configurations
@@ -47,14 +48,14 @@ but leave InstantScheduler_EnterCritical, InstantScheduler_LeaveCritical
 empty. This will alter only the module where this behavior is needed.
 
 
-FileNameWithoutExtension+_EnterCritical
-FileNameWithoutExtension+_LeaveCritical
+FileNameWithoutExtension + _EnterCritical
+FileNameWithoutExtension + _LeaveCritical
 ...
 etc...
 
 Also one can alter other InstantRTOS_Something stuff on per file basis
 
-FileNameWithoutExtension+_Panic
+FileNameWithoutExtension + _Panic
 etc...
 
 TODO: https://stackoverflow.com/questions/36381932/c-decrementing-an-element-of-a-single-byte-volatile-array-is-not-atomic-why
@@ -106,7 +107,7 @@ SOFTWARE.
 
 
 // Uncomment below to allow InstantRTOS_Enter/LeaveCritical
-//#define InstantRTOS_TryAllowCritical
+#define InstantRTOS_TryAllowCritical
 
 /* Make the best effort to take CPU specifics into account
   InstantRTOS_TryAllowCritical etc are important here */

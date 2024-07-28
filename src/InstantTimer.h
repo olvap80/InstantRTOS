@@ -1,7 +1,7 @@
 /** @file InstantTimer.h
  @brief Simple timing classes to track timings in platform independent way
 
-Simple platform independent time counting, without any dependencies,
+Simple platform independent handy time counting, without any dependencies,
 straight forward implementation to use directly from program loop,
 follows absolute minimalism to be cheap by memory and functionality.
 (Note: consider InstantScheduler.h when you need some more complex scheduling))
@@ -32,8 +32,6 @@ Ideal for single treaded environment, see sample below for details.
 
         pinMode(LED_BUILTIN, OUTPUT);
         pinMode(SIGNAL_PIN, OUTPUT);
-
-        //Note: timer_led is initially expired, so we will enter under if
         
         auto us = micros();
         timer_led.Start(us, 1000000);
@@ -121,8 +119,8 @@ SOFTWARE.
 class SimpleTimer{
 public:
     /// Initial timer
-    /** Initially timer is marked as already expired (does not count!),
-     *  One has to call Start to make it counting (non expired) */
+    /** Initially timer does not count (IsPending() returns false),
+     *  One has to call Start to make it counting */
     SimpleTimer() = default;
 
 
@@ -141,61 +139,61 @@ public:
     static constexpr Ticks DeltaMax = ~Ticks(0) / 2;
 
 
-    /// Mark timer as "non expired" and remember expiration moment
-    /** Remembers "expected" time for the timer to expire,
-     * from now all calls to IsExpired() return false,
+    /// Mark timer as "pending" and remember next trigger moment
+    /** Remembers "expected" time for the timer to trigger,
+     * from now all calls to IsPending() return true,
      * until delta ticks expires. */
     void Start(Ticks currentTicks, Ticks delta){
         expectedAbsoluteTicks = currentTicks + delta;
         //start counting 
-        expired = false;
+        isPending = true;
     }
 
-    /// Update and check for the "edge" as signal transitions to expired
+    /// Update and check for the "edge" when timer triggers
     /** Returns true only when delta ticks expires since call to Start API
      * this means new "expiration state" detected ("discovered"),
      * then all other subsequent calls will return false again.
-     * Use IsExpired() API to check if timer "fired" in past.
+     * Use IsPending() API to check if timer still counting.
      * Call Start() to "recharge" the timer again.
      *
      * It is assumed that Discover() is called more often then DeltaMax,
      * (actually more often then expected time precision!)
      * thus we will not miss the moment once timer expires! */
     bool Discover(Ticks currentTicks){
-        if( !expired ){
+        if( isPending ){
             //compare unsigned values assuming two's complement
             if( (currentTicks - expectedAbsoluteTicks) > DeltaMax ){
                 //current time is still before the desired time
                 return false;
             }
             // We have just detected time passed
-            expired = true;
-            //expiration detection is the only moment when true is returned
+            isPending = false;
+            //trigger detection is the only moment when true is returned
             return true;
         }
         return false;
     }
 
-    /// Test timer is expired without altering state (time is not checked!)
+    /// Test timer is pending without altering state (time is not checked!)
     /** Reads existing state (as calculated by the most recent Discover() call)
-     * @returns false only between Start and expiration moment,
-     *          true is returned before Start() of after Expire.
+     * @returns true only between Start and expiration moment,
+     *          false is returned before Start() of after expire.
      * 
      * Remember one must periodically call Discover() API to detect expiration!
      * Discover() returns true only as "edge" of expiration moment is detected,
-     * After Discover() has detected expiration, IsExpired() always returns true
+     * After Discover() has detected expiration, IsPending() always returns false
      * till Start() is called to "recharge" */
-    bool IsExpired() const {
-        return expired;
+    bool IsPending() const {
+        return isPending;
     }
 
-    /// Force timer to be marked as expired
-    /** Once marked as expired, Discover() API will have no effect 
+    /// Cancel timer without expiration (IsPending() becomes false)
+    /** Once Cancel-ed, Discover() API will have no effect 
      * and return false (as a sign that "nothing more was discovered"),
-     * but all subsequent calls to IsExpired() will return true from now!
+     * but all subsequent calls to IsPending() will return false from now!
      * Call Start to "recharge" timer again. */
-    void ForceExpire(){
-        expired = true;
+    void Cancel(){
+        isPending = false;
     } 
 
 
@@ -210,9 +208,9 @@ public:
     bool Discover(OtherTicks currentTicks) = delete;
 
 private:
-    /// True if timer is expired (not waiting for the next)
-    bool expired = true;
-    ///Time when Timer will expire (Discover() API shall detect expiration)
+    /// True if timer is between Start and expire
+    bool isPending = false;
+    ///Time when Timer will trigger/expire (Discover() API shall detect expiration)
     /** In this way we remember only the single value to compare with! */
     Ticks expectedAbsoluteTicks = 0;
 };

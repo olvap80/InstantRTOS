@@ -144,8 +144,8 @@ Additional sample inspired by https://www.chiark.greenend.org.uk/~sgtatham/corou
                 }
                 if (c == 0xFF) { // sign we met repetition
                     CoroutineYield(); // wait for length
-                    len = c;
-                    CoroutineYield(); // wait for repeated char
+                    len = c; //remember c is coroutine parameter here
+                    CoroutineYield(); // wait for repeated char to c
                     while (len--){
                         parser(c);
                     }
@@ -302,8 +302,8 @@ class CoroutineBase;
  * "Panic" is issued when trying to resume stopped coroutine.
  * Use LifetimeManager from InstantMemory.h 
  * if you wish to have "restartable" coroutines */
-#define CoroutineStop(lastRVal) \
-    do { cppCoroutine_State.current = CppCoroutine_State::Final; return lastRVal; } while (false)
+#define CoroutineStop(...) \
+    do { cppCoroutine_State.current = CppCoroutine_State::Final; return __VA_ARGS__; } while (false)
 
 /// End of the coroutine body (corresponds to CoroutineBegin() above)
 /** Remember, one shall not reach CoroutineEnd(),
